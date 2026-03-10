@@ -25,37 +25,37 @@
   if (isset($_GET['action']) and ($_GET['action'] == 'smartdevice'))
   {
     //$.get('https://sequematic.com/trigger-custom-webhook/A263C22047/111903/' + device + '/1');
-    //$json = file_get_contents("https://sequematic.com/trigger-custom-webhook/A263C22047/111903/{$_GET[device]}/{$_GET[state]}");
+    //$json = file_get_contents("https://sequematic.com/trigger-custom-webhook/A263C22047/111903/{$_GET['device']}/{$_GET[state]}");
     
-    if ($_GET[device] == "SPOTS" )
+    if ($_GET['device'] == "SPOTS" )
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_SPOTS_ON");
       else
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_SPOTS_OFF");
     }
-    elseif ($_GET[device] == "STAGE" )
+    elseif ($_GET['device'] == "STAGE" )
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_STAGE_ON");
       else
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_STAGE_OFF");
     }
-    elseif ($_GET[device] == "FRONT")
+    elseif ($_GET['device'] == "FRONT")
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_FRONT_ON");
       else
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_FRONT_OFF");
     }
-    elseif ($_GET[device] == "LG_LEFT")
+    elseif ($_GET['device'] == "LG_LEFT")
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://10.241.143.134:8123/api/webhook/lg-panel-left-power-TnbcwYbTcEuZdSmqKU0Is-FP");
       else
         $json = file_get_contents("http://10.241.143.134:8123/api/webhook/lg-panel-left-power-TnbcwYbTcEuZdSmqKU0Is-FP");
     }
-    elseif ($_GET[device] == "LG_RIGHT")
+    elseif ($_GET['device'] == "LG_RIGHT")
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://10.241.143.134:8123/api/webhook/lg-panel-right-power-x5veUcCSqeq-q9wiHLBoFKkx");

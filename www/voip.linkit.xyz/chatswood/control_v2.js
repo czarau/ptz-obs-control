@@ -203,7 +203,7 @@ function GotoCameraPosEx(pos, admin = false)
    
   // Remove all thumbs refreshing for camera if previously set...
   $thumb = $('.pos_thumb.refresh'+cam);
-  if ($thumb.lenth != 0)
+  if ($thumb.length != 0)
     $thumb.removeClass('refresh'+cam);
 
   if (admin)
@@ -243,7 +243,7 @@ function GotoCameraPosEx(pos, admin = false)
   setTimeout(function(){
     $thumb = $('.pos_thumb.refresh'+cam);
 
-    if ($thumb.lenth == 0)
+    if ($thumb.length == 0)
       return;
     $thumb.removeClass('refresh'+cam);
     //$thumb.attr("src", CameraURL(cam) + "/snapshot.jpg?rand=" + Math.random());
@@ -267,7 +267,7 @@ function UpdateImages($this)
     
   // Remove all thumbs refreshing for camera if previously set...
   $thumb = $('.pos_thumb.refresh'+cam);
-  if ($thumb.lenth != 0)
+  if ($thumb.length != 0)
     $thumb.removeClass('refresh'+cam);
 
   $(".cam_ctl_btn.cam" + cam + ".live").addClass('updating').text('UPDATING...');
@@ -410,7 +410,7 @@ function SetTimeoutCameraPos($this)
   
   let value = prompt("Please enter a time in seconds", oldvalue);
   
-  if (value !== oldvalue & !isNaN(value) & value >= 5 & value <= 60)
+  if (value !== oldvalue && !isNaN(value) && value >= 5 && value <= 60)
   {
     $label.text(value);
 
@@ -827,7 +827,7 @@ function ManualMoveCamera(e)
   
   // Remove all thumbs refreshing for camera if previously set...
   $thumb = $('.pos_thumb.refresh'+cam);
-  if ($thumb.lenth != 0)
+  if ($thumb.length != 0)
     $thumb.removeClass('refresh'+cam);
   
   let panspeed = 1;
@@ -964,7 +964,7 @@ function ManualMoveWheel(e)
   
   // Remove all thumbs refreshing for camera if previously set...
   $thumb = $('.pos_thumb.refresh'+cam);
-  if ($thumb.lenth != 0)
+  if ($thumb.length != 0)
     $thumb.removeClass('refresh'+cam);  
   
   let delayMS = e.timeStamp - tmrZoomScrollLastTime;
@@ -989,21 +989,21 @@ function ManualMoveWheel(e)
     tiltspeed = 10;      
   }      
   
-  if ((move == 'ZI' & scroll > 0) || (move == 'ZO'  & scroll > 0)){
+  if ((move == 'ZI' && scroll > 0) || (move == 'ZO' && scroll > 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&zoomin&' + zoomspeed);}
-  else if ((move == 'ZI' & scroll < 0) || (move == 'ZO'  & scroll < 0)){
+  else if ((move == 'ZI' && scroll < 0) || (move == 'ZO' && scroll < 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&zoomout&' + zoomspeed);}
-  else if ((move == 'FI' & scroll > 0) || (move == 'FO'  & scroll > 0)){
+  else if ((move == 'FI' && scroll > 0) || (move == 'FO' && scroll > 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&focusin&' + zoomspeed);}
-  else if ((move == 'FI' & scroll < 0) || (move == 'FO'  & scroll < 0)){
+  else if ((move == 'FI' && scroll < 0) || (move == 'FO' && scroll < 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&focusout&' + zoomspeed);}
-  else if ((move == 'L' & scroll < 0) || (move == 'R' & scroll < 0)){
+  else if ((move == 'L' && scroll < 0) || (move == 'R' && scroll < 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&right&' + panspeed + '&' + tiltspeed);}
-  else if ((move == 'L' & scroll > 0) || (move == 'R' & scroll > 0)){
+  else if ((move == 'L' && scroll > 0) || (move == 'R' && scroll > 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&left&' + panspeed + '&' + tiltspeed);}
-  else if ((move == 'D' & scroll < 0) || (move == 'U' & scroll > 0)){
+  else if ((move == 'D' && scroll < 0) || (move == 'U' && scroll > 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&up&' + panspeed + '&' + tiltspeed);}
-  else if ((move == 'D' & scroll > 0) || (move == 'U' & scroll < 0)){
+  else if ((move == 'D' && scroll > 0) || (move == 'U' && scroll < 0)){
     $.get(cam_url + '/cgi-bin/ptzctrl.cgi?ptzcmd&down&' + panspeed + '&' + tiltspeed);}
 
   if (move == 'ZI' || move == 'ZO'){
@@ -1066,7 +1066,7 @@ function DoAutoSwitch()
   GotoCameraPosEx($obj_next.attr('pos'));
   
   // Queue next Scene preset...
-  if (CameraFromClass($obj_queued) !== CameraFromClass($obj_next) & !$obj_queued.hasClass('active'))
+  if (CameraFromClass($obj_queued) !== CameraFromClass($obj_next) && !$obj_queued.hasClass('active'))
   {
     if (CameraFromClass($obj_queued) !== CameraFromClass($obj_current))
       GotoCameraPosEx($obj_queued.attr('pos'));
@@ -1125,7 +1125,7 @@ function AutoSwitch()
   console.log(`AutoQueue Next Preset ${preset_queued} in ${timeout}ms`);
   
   // Queue next Scene preset...
-  if (CameraFromClass($obj_queued) !== CameraFromClass($obj_curr) & !$obj_queued.hasClass('active'))
+  if (CameraFromClass($obj_queued) !== CameraFromClass($obj_curr) && !$obj_queued.hasClass('active'))
     GotoCameraPosEx($obj_queued.attr('pos'));
   
   NextAutoTime.setTime((new Date()).getTime() + timeout);
