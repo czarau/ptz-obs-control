@@ -53,13 +53,14 @@
     $cam_url = GetCameraURL($cam);
     $jpg = file_get_contents($cam_url."/action_snapshot?".$d);
     
-    if (strlen($jpg) > 0) 
+    header('Content-Type: image/jpeg');
+    if (strlen($jpg) > 0)
     {
       file_put_contents("thumbs/{$id}.jpg", $jpg);
       echo $jpg;
     }
     else
-      echo file_get_contents("thumbs/_blank.jpg"); 
+      echo file_get_contents("thumbs/_blank.jpg");
   }
   elseif ($_GET['cmd'] == 'set_preset')
   {
@@ -136,6 +137,7 @@
     if (!is_numeric($id))
       die;
 
+    header('Content-Type: image/jpeg');
     if (!file_exists("thumbs/{$id}.jpg") or filesize("thumbs/{$id}.jpg") == 0)
     {
       $jpg = file_get_contents("thumbs/_blank.jpg");

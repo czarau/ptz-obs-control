@@ -181,7 +181,7 @@ const WebOBS_Password = '<?php echo $WebOBS_Password; ?>';
 <body>
 <div style="width:1400px; margin:auto; left:0; right:0;">
 
-<div id="admin_access" user="<?php if (isset($_GET['id'])) echo $_GET['id']; else echo "chatswood"; ?>"><i class="fa-solid fa-unlock"></i></div>
+<div id="admin_access" user="<?php if (isset($_GET['id'])) echo htmlspecialchars($_GET['id'], ENT_QUOTES, 'UTF-8'); else echo "chatswood"; ?>"><i class="fa-solid fa-unlock"></i></div>
 
 <div class="camera_presets" style="margin:auto; left:0; right:0; text-align:center;">
   <div class="preset_column" style="display:inline-block; width:160px;">
