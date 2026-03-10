@@ -174,34 +174,34 @@
       die;
 
     $ip = GetCameraIP($cam);
-    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip={$ip}");
+    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip));
     echo $json;
-  }  
+  }
   elseif ($_GET['cmd'] == 'goto')
   {
     // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=goto&camera=1&val=100
     $cam = $_GET['camera'];
-    $val = $_GET['val'];    
+    $val = $_GET['val'];
 
-    if (!is_numeric($cam))
+    if (!is_numeric($cam) || !is_numeric($val))
       die;
 
     $ip = GetCameraIP($cam);
-    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip={$ip} --cmd=goto --val={$val}");
+    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip)." --cmd=goto --val=".escapeshellarg($val));
     echo $json;
-  }    
+  }
   elseif ($_GET['cmd'] == 'preset_speed')
   {
     //1..24
     // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=preset_speed&camera=1&val=18
     $cam = $_GET['camera'];
-    $val = $_GET['val'];    
+    $val = $_GET['val'];
 
-    if (!is_numeric($cam))
+    if (!is_numeric($cam) || !is_numeric($val))
       die;
 
     $ip = GetCameraIP($cam);
-    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip={$ip} --cmd=goto --val={$val}");
+    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip)." --cmd=goto --val=".escapeshellarg($val));
     echo $json;
   }     
   
