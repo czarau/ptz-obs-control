@@ -1,0 +1,270 @@
+{
+    "preset_start_index": 20,
+    "preset_admin_index": 60,
+    "presets": [
+        {
+            "camera": "1",
+            "label": "Lecturn"
+        },
+        {
+            "camera": "1",
+            "label": "Wide"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "3",
+            "label": "Right"
+        },
+        {
+            "camera": "3",
+            "label": "Wide"
+        },
+        {
+            "camera": "3",
+            "label": "Preset"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "2",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Front"
+        },
+        {
+            "camera": "1",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Back"
+        },
+        {
+            "camera": "2",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Front"
+        },
+        {
+            "camera": "1",
+            "label": "Wide"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "3",
+            "label": "Right"
+        },
+        {
+            "camera": "3",
+            "label": "Right"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "1",
+            "label": "Front"
+        },
+        {
+            "camera": "1",
+            "label": "Wide"
+        },
+        {
+            "camera": "1",
+            "label": "Custom 1"
+        },
+        {
+            "camera": "3",
+            "label": "Custom 2"
+        },
+        {
+            "camera": "2",
+            "label": "Custom 3"
+        },
+        {
+            "camera": "1",
+            "label": "Sabbath School"
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "20"
+        },
+        {
+            "camera": "3",
+            "label": "Preset",
+            "timeout": "8"
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "20"
+        },
+        {
+            "camera": "2",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "15"
+        },
+        {
+            "camera": "3",
+            "label": "Preset",
+            "timeout": "6"
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "15"
+        },
+        {
+            "camera": "3",
+            "label": "Preset"
+        }
+    ],
+    "presets_admin": [
+        {
+            "camera": "1",
+            "label": "Lecturn"
+        },
+        {
+            "camera": "1",
+            "label": "Wide"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "3",
+            "label": "Right"
+        },
+        {
+            "camera": "3",
+            "label": "Wide"
+        },
+        {
+            "camera": "3",
+            "label": "Preset"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "2",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Front"
+        },
+        {
+            "camera": "1",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Back"
+        },
+        {
+            "camera": "2",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Front"
+        },
+        {
+            "camera": "1",
+            "label": "Wide"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "3",
+            "label": "Right"
+        },
+        {
+            "camera": "3",
+            "label": "Right"
+        },
+        {
+            "camera": "2",
+            "label": "Left"
+        },
+        {
+            "camera": "1",
+            "label": "Front"
+        },
+        {
+            "camera": "1",
+            "label": "Wide"
+        },
+        {
+            "camera": "1",
+            "label": "Custom 1"
+        },
+        {
+            "camera": "3",
+            "label": "Custom 2"
+        },
+        {
+            "camera": "2",
+            "label": "Custom 3"
+        },
+        {
+            "camera": "1",
+            "label": "Sabbath School"
+        },
+        {
+            "camera": "1",
+            "label": "Preset"
+        },
+        {
+            "camera": "3",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Preset"
+        },
+        {
+            "camera": "2",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Preset"
+        },
+        {
+            "camera": "3",
+            "label": "Preset"
+        },
+        {
+            "camera": "1",
+            "label": "Preset"
+        },
+        {
+            "camera": "3",
+            "label": "Preset"
+        }
+    ]
+}

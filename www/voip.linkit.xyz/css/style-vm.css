@@ -1,0 +1,222 @@
+div.vm-title {
+  height:35px; 
+  padding:5px; 
+  background-color:#272775; 
+  color:white;
+  font-weight: bold;
+}
+
+div.vm-note-btns {
+  min-height: 25px;
+  font-size: 10px;
+}
+
+.voicemail {
+  font-size: 18px;
+}
+
+.vm-transcode pre {
+  position: relative;
+  top: 0px;
+  left: 0px;
+	font-family: Helvetica, Arial, sans-serif;
+	font-size: 8px;
+  padding: 5px;
+}
+
+div.vm-note-btn {
+  position: relative;
+  float: right !important;
+  background-color: #1aaa55a1;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+div.vm-note-btn:hover {
+  background-color: #1aaa55;
+}
+
+div.vm-note {
+  padding: 5px 20px;
+  background: #ffffcc;
+  font-size: 10px;
+  white-space: pre-wrap;
+}
+
+.vm-note-hdr {
+  border-top: 1px solid #cccccc;
+  background: #ffffcc;
+  width: 100%;
+  color: #666666;
+  font-size: 10px; 
+}
+
+.vm-note-delete {
+  position: relative;
+  background: #ffffcc;
+  float: right !important;
+  color: #aaaaaa;
+  font-size: 10px; 
+  cursor: pointer;
+}
+
+.vm-add-note {
+  width: 100%;
+  font-size: 10px;
+}
+
+.vm-note-text {
+  width: 100%;
+  font-size: 10px;
+}
+
+.vm-upload-btn {
+  background-color: #27277547;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.vm-upload .vm-submit {
+  background-color: #1aaa55a1;
+  position: absolute;
+  right: 0px;
+}
+
+.fax-btn {
+  background-color: #27277547;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.fax-btn:hover {
+  background-color: #272775;
+}
+
+.fax-send {
+  position: relative;
+  font-size: 18px;
+}
+
+.fax-send .fax-submit {
+  background-color: #1aaa55a1;
+  position: absolute;
+  right: 0px;
+}
+
+.fax-submit:hover {
+  background-color: #1aaa55;
+}
+
+.fax-send .fax-file {
+  position: absolute;
+  left: 130px;
+  top: 28px;
+}
+
+.fax-submit {
+  /*background-color: #1aaa55;*/
+  position: absolute;
+  right: 0px;
+  bottom: 0px;
+}
+
+.fax {
+  position: relative;
+}
+
+.fax-hdr {
+  border-top: 1px solid #27277547;
+  position: relative;
+  font-size: 18px;
+  height: 32px;
+}
+
+.fax .fax-desc{
+  position: absolute;
+  font-size: 14px;
+  left: 0px;
+}
+
+.fax .fax-time{
+  position: absolute;
+  font-size: 8px;
+  left: 0px;
+  top: 16px;
+}
+
+.fax .fax-time .time-offset{
+  font-size: 8px;
+  color: #666;
+}
+
+.fax .fax-status{
+  position: absolute;
+  font-size: 10px;
+  right: 0px;
+  color: #1aaa55;
+}
+
+.fax .fax-retries{
+  position: absolute;
+  font-size: 8px;
+  right: 55px;
+  color: #666;
+  top: 2px;
+}
+
+.fax .failed{ 
+  color: red;
+}
+
+.fax .fax-resend {
+  position: absolute;
+  font-size: 10px;
+  right: 55px;
+  top: 14px;
+}
+
+.fax .fax-delete {
+  position: absolute;
+  font-size: 10px;
+  right: 0px;
+  top: 14px;
+}
+
+.fax-events{
+  position: relative;
+}
+
+.fax-event{
+  position: relative;
+  height: 16px;
+}
+
+.fax-event-time{
+  position: absolute;
+  font-size: 8px;
+  left: 10px;
+  top: 0px;
+}
+.fax-event-status{
+  position: absolute;
+  font-size: 8px;
+  left: 170px;
+  top: 0px;
+}
+
+.fax-event-pages{
+  position: absolute;
+  font-size: 8px;
+  /*left: 280px;*/
+  left: 130px;
+  top: 0px;
+}

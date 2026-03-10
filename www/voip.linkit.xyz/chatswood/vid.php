@@ -1,0 +1,1 @@
+<video width="700" src="http://10.241.57.96:8085" autoplay type="video"></video>
