@@ -12,19 +12,24 @@
 
 const { useState: useStatePG, useEffect: useEffectPG, useRef: useRefPG } = React;
 
-const SLOT_BUCKETS = [
-  { key: 'speaker',  title: 'Speaker',      slots: [0, 1, 2, 3],                        cols: 1, span: 1 },
-  { key: 'piano',    title: 'Piano',        slots: [4, 5, 6, 7, 8, 9, 10, 11],          cols: 2, span: 2 },
-  { key: 'singers',  title: 'Singers',      slots: [12, 13, 14, 15],                    cols: 1, span: 1 },
-  { key: 'cong',     title: 'Congregation', slots: [16, 17, 18, 19],                    cols: 1, span: 1 },
-  { key: 'custom',   title: 'Custom',       slots: [20, 21, 22, 23],                    cols: 1, span: 1 },
-];
+// Column layout. Read from settings.json via LS_CONFIG.buckets / queueSlots
+// (PHP injects them) so each site can define its own categories and slot
+// ranges without editing code. Defaults here are back-compat fallbacks.
+const SLOT_BUCKETS = (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.buckets) && window.LS_CONFIG.buckets.length)
+  ? window.LS_CONFIG.buckets
+  : [
+      { key: 'speaker',  title: 'Speaker',      slots: [0, 1, 2, 3],                 cols: 1, span: 1 },
+      { key: 'piano',    title: 'Piano',        slots: [4, 5, 6, 7, 8, 9, 10, 11],   cols: 2, span: 2 },
+      { key: 'singers',  title: 'Singers',      slots: [12, 13, 14, 15],             cols: 1, span: 1 },
+      { key: 'cong',     title: 'Congregation', slots: [16, 17, 18, 19],             cols: 1, span: 1 },
+      { key: 'custom',   title: 'Custom',       slots: [20, 21, 22, 23],             cols: 1, span: 1 },
+    ];
 
-// Auto queue lives in its own slot range (24-31) in the same flat presets[]
-// array. Each queue slot stores its own {camera, label, timeout}, completely
-// independent from the category columns — arming/going-live on a queue card
-// does NOT highlight any category card and vice versa.
-const QUEUE_SLOTS = [24, 25, 26, 27, 28, 29, 30, 31];
+// Auto queue slot range — separate flat range that doesn't collide with any
+// category bucket. Also server-configurable.
+const QUEUE_SLOTS = (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.queueSlots) && window.LS_CONFIG.queueSlots.length)
+  ? window.LS_CONFIG.queueSlots
+  : [24, 25, 26, 27, 28, 29, 30, 31];
 
 const CAM_SCENE = { '1': 'Camera 1 - Back', '2': 'Camera 2 - Left', '3': 'Camera 3 - Right' };
 // Same direct-to-camera CGI hosts as live-feeds.jsx / chatswood/control_v2.js

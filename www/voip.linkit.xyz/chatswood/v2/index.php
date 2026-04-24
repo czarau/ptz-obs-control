@@ -18,6 +18,19 @@
   $settings = file_exists($settingsFile)
     ? json_decode(file_get_contents($settingsFile), true)
     : ['preset_start_index' => 100, 'preset_admin_index' => 150, 'presets' => []];
+
+  // Default column layout — matches slots 0-23 for categories, 24-31 for
+  // the auto queue. Override by adding a "buckets" / "queue_slots" section
+  // to .data/settings.json (or settings-shccc.json).
+  $defaultBuckets = [
+    ['key' => 'speaker',  'title' => 'Speaker',      'slots' => [0, 1, 2, 3],                         'cols' => 1, 'span' => 1],
+    ['key' => 'piano',    'title' => 'Piano',        'slots' => [4, 5, 6, 7, 8, 9, 10, 11],           'cols' => 2, 'span' => 2],
+    ['key' => 'singers',  'title' => 'Singers',      'slots' => [12, 13, 14, 15],                     'cols' => 1, 'span' => 1],
+    ['key' => 'cong',     'title' => 'Congregation', 'slots' => [16, 17, 18, 19],                     'cols' => 1, 'span' => 1],
+    ['key' => 'custom',   'title' => 'Custom',       'slots' => [20, 21, 22, 23],                     'cols' => 1, 'span' => 1],
+  ];
+  $buckets     = $settings['buckets']     ?? $defaultBuckets;
+  $queueSlots  = $settings['queue_slots'] ?? [24, 25, 26, 27, 28, 29, 30, 31];
 ?>
 <!doctype html>
 <html lang="en">
@@ -41,6 +54,8 @@
       presetStartIndex: <?= (int)($settings['preset_start_index'] ?? 100) ?>,
       presetAdminIndex: <?= (int)($settings['preset_admin_index'] ?? 150) ?>,
       presets:          <?= json_encode($settings['presets'] ?? []) ?>,
+      buckets:          <?= json_encode($buckets) ?>,
+      queueSlots:       <?= json_encode($queueSlots) ?>,
       thumbEndpoint:    "../control_thumb.php",
       smartEndpoint:    "../index.php",
       webrtcStreams: {
