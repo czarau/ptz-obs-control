@@ -10,7 +10,7 @@
 //   transfers to the new preset automatically since the program feed just
 //   moved with the camera.
 
-const { useState: useStatePG, useEffect: useEffectPG } = React;
+const { useState: useStatePG, useEffect: useEffectPG, useRef: useRefPG } = React;
 
 const SLOT_BUCKETS = [
   { key: 'speaker',  title: 'Speaker',      slots: [0, 1, 2, 3],                        cols: 1, span: 1 },
@@ -271,6 +271,10 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
   // Thumb-id → timestamp. When set, ThumbCard requests a fresh snapshot.
   const [refreshMap, setRefreshMap] = useStatePG({});
   const menu = useContextMenu();
+  // Ref mirror of activeByCam so async callbacks (setTimeout, settle.then)
+  // can see the latest value without re-registering handlers.
+  const activeByCamRef = useRefPG({});
+  useEffectPG(() => { activeByCamRef.current = activeByCam; }, [activeByCam]);
 
   // Clear the "at-position" marker for a camera whenever it's manually jogged
   // (PTZPad in live-feeds.jsx dispatches this event on pan/tilt/zoom).
@@ -374,14 +378,29 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setMotionByCam(m => ({ ...m, [cam]: id }));
     setTimeout(() => {
-      setMotionByCam(m => (m[cam] === id ? { ...m, [cam]: null } : m));
-      setRefreshMap(m => ({ ...m, [id]: Date.now() }));
+      // Only act if this preset is still the latest target for the camera.
+      // If the user clicked another thumb on the same camera (or jogged PTZ
+      // manually) before we arrived, the camera is heading somewhere else
+      // now — don't clear the new motion marker and don't refresh this thumb
+      // with what would be a transitional / wrong frame.
+      let stillValid = false;
+      setMotionByCam(m => {
+        if (m[cam] !== id) return m;
+        stillValid = true;
+        return { ...m, [cam]: null };
+      });
+      if (stillValid) {
+        setRefreshMap(m => ({ ...m, [id]: Date.now() }));
+      }
     }, MOTION_MS);
 
     // Poll the camera's pan/tilt/zoom/focus until it stops moving, then log
     // the final coordinates alongside the preset label. `settle()` keeps
     // sampling (~600 ms apart, up to 8 s) until two consecutive reads match.
+    // Same staleness guard: if the camera has been redirected since this
+    // click, skip the "Arrived" log for this preset.
     window.PTZState?.settle(preset.camera).then(pos => {
+      if (activeByCamRef.current[cam] !== id) return; // superseded
       if (pos) {
         window.Log?.add(
           'camera',
