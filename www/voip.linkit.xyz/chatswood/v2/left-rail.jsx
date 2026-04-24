@@ -142,6 +142,11 @@ function Icon({ name, size = 14 }) {
     case "pause":  return <svg {...common}><rect x="4" y="3" width="3" height="10"/><rect x="9" y="3" width="3" height="10"/></svg>;
     case "skip":   return <svg {...common}><path d="M3 3l7 5-7 5V3z" fill={stroke} stroke="none"/><rect x="11" y="3" width="2" height="10" fill={stroke} stroke="none"/></svg>;
     case "log":    return <svg {...common}><path d="M3 3h10v10H3z"/><path d="M5 6h6M5 8h6M5 10h4"/></svg>;
+    case "crosshairs": return <svg {...common}><circle cx="8" cy="8" r="5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/><circle cx="8" cy="8" r="1" fill={stroke}/></svg>;
+    case "edit":   return <svg {...common}><path d="M2 12l1.5-4L11 1l3 3-7.5 7.5L2 12z"/><path d="M9 3l3 3"/></svg>;
+    case "hourglass": return <svg {...common}><path d="M4 2h8M4 14h8"/><path d="M4 2c0 3 4 4 4 6s-4 3-4 6"/><path d="M12 2c0 3-4 4-4 6s4 3 4 6"/></svg>;
+    case "rotate": return <svg {...common}><path d="M14 8a6 6 0 1 1-2-4.5"/><path d="M14 2v4h-4"/></svg>;
+    case "save":   return <svg {...common}><path d="M3 2h8l3 3v9H3V2z"/><path d="M5 2v4h6V2"/><path d="M5 10h6v4H5z"/></svg>;
     default: return null;
   }
 }

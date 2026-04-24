@@ -519,8 +519,10 @@ em { font-style: normal; }
 .ctxmenu-item:hover:not(.disabled) { background: var(--surf-3); }
 .ctxmenu-item.disabled { color: var(--text-4); cursor: not-allowed; }
 .ctxmenu-item[disabled] { pointer-events: none; }
-.ctxmenu-icon { width: 18px; text-align: center; color: var(--text-3); font-family: var(--font-mono); }
-.ctxmenu-label { color: inherit; }
+.ctxmenu-icon { width: 18px; height: 14px; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.ctxmenu-item:hover:not(.disabled) .ctxmenu-icon { color: var(--text-2); }
+.ctxmenu-item.disabled .ctxmenu-icon { color: var(--text-4); }
+.ctxmenu-label { color: inherit; white-space: nowrap; }
 .ctxmenu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
 
 /* ---------- ADMIN TOGGLE ---------- */

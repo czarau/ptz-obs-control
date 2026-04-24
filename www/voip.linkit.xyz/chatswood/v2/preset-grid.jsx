@@ -409,9 +409,11 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     // Trigger a thumb refresh for this preset so the card picks up the new snapshot.
     const bumpThumb = () => setRefreshMap(m => ({ ...m, [id]: Date.now() }));
 
+    const ICO = (name) => <Icon name={name} size={13}/>;
     const items = [
       {
         label: 'Save Live',
+        icon: ICO('crosshairs'),
         disabled: !liveCam,
         onClick: () => {
           PRESET_ACTIONS.savePosition({ ...preset, camera: String(liveCam) }, liveCam);
@@ -419,12 +421,13 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         },
       },
       { separator: true },
-      { label: 'Save Camera Back',  onClick: () => { PRESET_ACTIONS.savePosition(preset, 1); setTimeout(bumpThumb, 1500); } },
-      { label: 'Save Camera Left',  onClick: () => { PRESET_ACTIONS.savePosition(preset, 2); setTimeout(bumpThumb, 1500); } },
-      { label: 'Save Camera Right', onClick: () => { PRESET_ACTIONS.savePosition(preset, 3); setTimeout(bumpThumb, 1500); } },
+      { label: 'Save Camera Back',  icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 1); setTimeout(bumpThumb, 1500); } },
+      { label: 'Save Camera Left',  icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 2); setTimeout(bumpThumb, 1500); } },
+      { label: 'Save Camera Right', icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 3); setTimeout(bumpThumb, 1500); } },
       { separator: true },
       {
         label: 'Rename',
+        icon: ICO('edit'),
         onClick: () => {
           const next = window.prompt('Rename preset', preset.label || '');
           if (next && next !== preset.label) PRESET_ACTIONS.rename(preset, next);
@@ -432,6 +435,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       },
       {
         label: 'Set Timeout',
+        icon: ICO('hourglass'),
         disabled: !isQueue,
         onClick: () => {
           const v = window.prompt('Timeout in seconds (5–60)', String(preset.timeout || 10));
@@ -440,9 +444,10 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         },
       },
       { separator: true },
-      { label: 'Restore Default', onClick: () => { PRESET_ACTIONS.restoreDefault(preset).then(bumpThumb); } },
+      { label: 'Restore Default', icon: ICO('rotate'), onClick: () => { PRESET_ACTIONS.restoreDefault(preset).then(bumpThumb); } },
       {
         label: 'Save as Default',
+        icon: ICO('save'),
         disabled: !admin || !isArmed,
         onClick: () => PRESET_ACTIONS.savePosition(preset, Number(preset.camera), { admin: true }),
       },

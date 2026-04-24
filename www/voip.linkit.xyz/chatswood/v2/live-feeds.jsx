@@ -51,7 +51,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
     const items = [
       {
         label: 'Update',
-        icon: '⟳',
+        icon: <Icon name="rotate" size={13}/>,
         onClick: () => {
           const presets = (window.LS_CONFIG?.presets || []);
           const startIndex = window.LS_CONFIG?.presetStartIndex || 100;
