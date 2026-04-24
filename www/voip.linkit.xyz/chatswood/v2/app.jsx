@@ -43,6 +43,15 @@ function App() {
   // Used to decide whether it's a valid cue target when a scene transitions.
   const isCuableSceneId = (id) => id === 'back' || id === 'left' || id === 'right' || id === 'data';
 
+  // Ref mirror of liveCamId so handlers that outlive a single render —
+  // most notably the OBS scene poll, which uses useEffect([]) and
+  // therefore captures a mount-time closure — can read the CURRENT live
+  // scene, not the one that was live when they were wired up. Without
+  // this the outgoing scene was always "back" (mount-time value), so
+  // every take cued Cam 1 regardless of what was actually on program.
+  const liveCamIdRef = React.useRef(liveCamId);
+  useEffect(() => { liveCamIdRef.current = liveCamId; }, [liveCamId]);
+
   // One helper for every "this scene just went live" transition. Updates
   // liveCam AND cues the OUTGOING scene so the next take naturally
   // ping-pongs back — user's requested "leave the last live scene as
@@ -50,9 +59,10 @@ function App() {
   // from it is a different action) and we never cue the one we just took.
   const onTakeSceneLive = (newId) => {
     if (!newId) return;
-    const outgoing = liveCamId;
+    const outgoing = liveCamIdRef.current;
+    if (outgoing === newId) return; // no transition, leave cue alone
     setLiveCam(newId);
-    if (outgoing && outgoing !== newId && isCuableSceneId(outgoing)) {
+    if (outgoing && isCuableSceneId(outgoing)) {
       setCuedSceneId(outgoing);
     } else {
       setCuedSceneId(null);
