@@ -639,14 +639,32 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
 
   // Drop target handler — a live-feed video was dragged onto this preset
   // thumb. Save the dropped camera's current PTZ+focus into this preset
-  // (same action as right-click → Save Camera Back/Left/Right, but via
-  // direct-manipulation).
+  // AND update the thumbnail image to the current view, so the dropped
+  // preset reflects both position and appearance immediately.
   const onThumbDrop = (id, preset, cam) => {
     const label = preset.label || `slot ${preset.slot}`;
-    window.Log?.add('camera', `Drop-save · Cam ${cam} → ${label}`,
-      `capturing PTZ…`);
+    window.Log?.add('camera', `Drop-save · Cam ${cam} → ${label}`, `capturing PTZ + thumb…`);
     const next = { ...preset, label: preset.label || 'Preset' };
-    PRESET_ACTIONS.savePosition(next, cam)
+
+    const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + preset.slot;
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+
+    // Grab the current WebRTC frame fast; fall back to server-side
+    // action_snapshot if the video hasn't buffered. The camera isn't
+    // going anywhere (drop doesn't move it) so either approach captures
+    // the correct view.
+    const snap = window.capturePresetThumb
+      ? window.capturePresetThumb(Number(cam), preset.slot).then(ok =>
+          ok ? true
+             : fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
+                 .then(() => true).catch(() => false)
+        )
+      : fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
+          .then(() => true).catch(() => false);
+
+    // Run PTZ save + thumb capture in parallel, then bump the thumb's
+    // cache-buster so the <img> reloads the freshly-written JPEG.
+    Promise.all([PRESET_ACTIONS.savePosition(next, cam), snap])
       .then(() => {
         setRefreshMap(m => ({ ...m, [id]: Date.now() + 1 }));
       })
