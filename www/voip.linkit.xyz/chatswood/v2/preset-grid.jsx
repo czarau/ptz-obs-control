@@ -671,19 +671,60 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     return () => clearInterval(id);
   }, [queueRunning]);
 
-  // When the queue is turned on, kick off the first take (unless we're
-  // resuming a paused mid-item countdown). Always reset the break-
-  // detector claims on transition — a stale claim from a prior run
-  // could cause the listener to either miss a real takeover (false
-  // match) or pause immediately on resume (if a ref still points at
-  // the wrong cam).
+  // Kick-off / resume logic. Always reset the break-detector claims
+  // on any queueRunning transition — a stale claim from a prior run
+  // could cause false matches or spurious pauses.
+  //
+  // Three resume cases:
+  //
+  //   Fresh start (timer=0): take the current slot. queueLiveIdx
+  //     defaults to 0 so this is slot 0 unless someone's moved it.
+  //
+  //   Paused mid-slot, live focus INTACT (liveCamera still on the
+  //     current slot's camera): nothing to do — the tick interval
+  //     restarts on queueRunning change and carries the countdown.
+  //
+  //   Paused mid-slot, live focus LOST (operator took a different
+  //     scene while paused): resume by jumping to the first queue
+  //     slot whose thumb is armed (the "cued" queue thumb), or if
+  //     nothing's armed, restart from slot 0. Matches the operator's
+  //     mental model — resuming shouldn't silently keep counting on
+  //     a camera that hasn't been on air for minutes.
   useEffectPG(() => {
     queueClaimCamIdRef.current = null;
     queuePreRollIdRef.current = null;
     queuePreRollCamRef.current = null;
-    if (queueRunning && queueTimerRef.current === 0) {
-      takeQueueItem(queueLiveIdxRef.current);
+    if (!queueRunning) return;
+
+    const curIdx = queueLiveIdxRef.current;
+    const curSlot = QUEUE_SLOTS[curIdx];
+    const curPre = presetFor(curSlot);
+    const expectedCam = Number(curPre.camera);
+    const focusIntact = Number(liveCamera) === expectedCam;
+
+    if (queueTimerRef.current === 0) {
+      // Fresh start — take from current index.
+      takeQueueItem(curIdx);
+      return;
     }
+
+    if (focusIntact) {
+      // Mid-slot resume, program still on the expected camera — the
+      // tick interval picks up where it left off. No take needed.
+      window.Log?.add('live', 'Queue resumed', `${curPre.label} · ${queueTimerRef.current}s left`);
+      return;
+    }
+
+    // Lost focus. Find the first queue slot whose thumb is armed;
+    // fall back to slot 0 (the "1st thumb").
+    const armedIdx = QUEUE_SLOTS.findIndex(slot => {
+      const p = presetFor(slot);
+      const cam = String(p.camera);
+      return activeByCam[cam] === `queue-${slot}`;
+    });
+    const startIdx = armedIdx >= 0 ? armedIdx : 0;
+    window.Log?.add('live', 'Queue resumed · focus lost', `starting slot ${startIdx + 1}`);
+    takeQueueItem(startIdx);
   }, [queueRunning]);
 
   // Note: a reactive interrupt-detector was attempted here (auto-pause
