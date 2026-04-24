@@ -27,14 +27,14 @@
     //$.get('https://sequematic.com/trigger-custom-webhook/A263C22047/111903/' + device + '/1');
     //$json = file_get_contents("https://sequematic.com/trigger-custom-webhook/A263C22047/111903/{$_GET['device']}/{$_GET[state]}");
     
-    if ($_GET['device'] == "SPOTS" )
+    if ($_GET['device'] == "SPOTS" )
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_SPOTS_ON");
       else
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_SPOTS_OFF");
     }
-    elseif ($_GET['device'] == "STAGE" )
+    elseif ($_GET['device'] == "STAGE" )
     {
       if ($_GET['state'] == 1)
         $json = file_get_contents("http://192.168.192.80:8123/api/webhook/CHURCH_STAGE_ON");
@@ -114,7 +114,7 @@
     if (isset($settings['presets'][$preset]))
       return $settings['presets'][$preset]['camera'];
     
-    return 1;    
+    return 1;
   }
   
   function GetPresetLabel($preset)
@@ -124,7 +124,7 @@
     if (isset($settings['presets'][$preset]))
       return $settings['presets'][$preset]['label'];
     
-    return "Preset";    
+    return "Preset";
   }  
   
   function GetPresetTimeout($preset)
@@ -134,10 +134,8 @@
     if (isset($settings['presets'][$preset]) && isset($settings['presets'][$preset]['timeout']))
       return $settings['presets'][$preset]['timeout'];
     
-    return 10;    
-  }    
-  
-  GetPresetLabel
+    return 10;
+  }
 ?>
 <html lang="en">
 <head>
@@ -406,7 +404,7 @@ $(function(){
     let pos = $(this).attr('pos');
     let $thumb = $(this).find(".pos_thumb");
     //alert(pos);
-    $thumb.attr("src", 'https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb_cache&id=' + pos + '&ts=' + (new Date()).getTime());
+    $thumb.attr("src", 'https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=thumb_cache&id=' + pos + '&ts=' + (new Date()).getTime());
   });
 
   $(".camera_pos").click(GotoCameraPos);
@@ -445,7 +443,7 @@ $(function(){
   //$.get('http://' + CameraIp(1) + '/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
   //$.get('http://' + CameraIp(2) + '/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
   //$.get('http://' + CameraIp(3) + '/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
-  $.get('https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=init');
+  $.get('https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=init');
   
   /*
   $(".camera_pos").each(function() {
@@ -549,13 +547,19 @@ $(function(){
   startWebRTCPlay('#vid_cam4', 'https://srv-syd05.chatswoodchurch.org:8084/stream/ce75e370-03a9-4cd9-b44a-2059103dda93/channel/0/webrtc');
   */
  
-  startWebRTCPlay('#vid_cam1', 'https://srv-syd05.chatswoodchurch.org/stream/d8a30b26-a287-4b7b-b06f-2fd82de34ee3/channel/0/webrtc?uuid=d8a30b26-a287-4b7b-b06f-2fd82de34ee3&channel=0');
-  startWebRTCPlay('#vid_cam2', 'https://srv-syd05.chatswoodchurch.org/stream/1c502db8-03d3-47ae-a95f-910551d118fd/channel/0/webrtc?uuid=1c502db8-03d3-47ae-a95f-910551d118fd&channel=0');
-  startWebRTCPlay('#vid_cam3', 'https://srv-syd05.chatswoodchurch.org/stream/52055f06-249c-4b74-8fa2-d69b701fd1b7/channel/0/webrtc?uuid=52055f06-249c-4b74-8fa2-d69b701fd1b7&channel=0'); 
-  startWebRTCPlay('#vid_cam4', 'https://srv-syd05.chatswoodchurch.org/stream/ce75e370-03a9-4cd9-b44a-2059103dda93/channel/0/webrtc?uuid=ce75e370-03a9-4cd9-b44a-2059103dda93&channel=0');
+  //startWebRTCPlay('#vid_cam1', 'https://srv-syd05.chatswoodchurch.org/stream/d8a30b26-a287-4b7b-b06f-2fd82de34ee3/channel/0/webrtc?uuid=d8a30b26-a287-4b7b-b06f-2fd82de34ee3&channel=0');
+  //startWebRTCPlay('#vid_cam2', 'https://srv-syd05.chatswoodchurch.org/stream/1c502db8-03d3-47ae-a95f-910551d118fd/channel/0/webrtc?uuid=1c502db8-03d3-47ae-a95f-910551d118fd&channel=0');
+  //startWebRTCPlay('#vid_cam3', 'https://srv-syd05.chatswoodchurch.org/stream/52055f06-249c-4b74-8fa2-d69b701fd1b7/channel/0/webrtc?uuid=52055f06-249c-4b74-8fa2-d69b701fd1b7&channel=0'); 
+  //startWebRTCPlay('#vid_cam4', 'https://srv-syd05.chatswoodchurch.org/stream/ce75e370-03a9-4cd9-b44a-2059103dda93/channel/0/webrtc?uuid=ce75e370-03a9-4cd9-b44a-2059103dda93&channel=0');
+  
+  // USES go2rtc
+  startWebRTCPlay('#vid_cam1', 'https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=camera1');
+  startWebRTCPlay('#vid_cam2', 'https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=camera2');
+  startWebRTCPlay('#vid_cam3', 'https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=camera3');
+  startWebRTCPlay('#vid_cam4', 'https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=usb_hdmi_720p');
 
   /*
-  $.getJSON( "https://voip.linkit.xyz/chatswood/cameras.json")
+  $.getJSON( "https://srv-syd05.chatswoodchurch.org/cameras.json")
     .done(function( data ) {
       $.each( data.items, function( i, item ) {
         alert("1");

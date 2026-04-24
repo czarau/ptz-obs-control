@@ -23,7 +23,8 @@ var obsScenes = null;
 //const WebOBS_Password = '<?php echo $WebOBS_Password; ?>';
 
 //var DP_Scene_Object_Name = 'DP_Stream';
-var DP_LRT_Object_Name = 'NDI™ 5 Source (DP Stream)';
+//var DP_LRT_Object_Name = 'NDI™ 5 Source (DP Stream)';
+var DP_LRT_Object_Name = 'DP Computer';
 var DP_L3RD_Object_Name = 'NDI™ 5 Source (DP Stream L3RD)';
 
 function CameraURL(cam)
@@ -248,7 +249,8 @@ function GotoCameraPosEx(pos, admin = false)
     $thumb.removeClass('refresh'+cam);
     //$thumb.attr("src", CameraURL(cam) + "/snapshot.jpg?rand=" + Math.random());
     //$thumb.attr("src", CameraURL(cam) + '/action_snapshot?' + (new Date()).getTime());
-    $thumb.attr("src", 'https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb&user=' + GetUser() + '&camera=' + cam + '&id=' + pos + '&ts=' + (new Date()).getTime());
+    //$thumb.attr("src", 'https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb&user=' + GetUser() + '&camera=' + cam + '&id=' + pos + '&ts=' + (new Date()).getTime());
+    $thumb.attr("src", 'https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=thumb&camera=' + cam + '&id=' + pos + '&ts=' + (new Date()).getTime());
   }, 5000);  
 }
 
@@ -324,9 +326,9 @@ function SetCameraPos($this, admin = false, cam = null)
   //localStorage.setItem("pos_" + pos + "_cam", cam);
   
   if (!admin)
-    $.get('https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&id=' + preset + '&camera=' + cam + '&label=' + encodeURI(lbl) + '&ts=' + (new Date()).getTime());
+    $.get('https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&id=' + preset + '&camera=' + cam + '&label=' + encodeURI(lbl) + '&ts=' + (new Date()).getTime());
   else
-    $.get('https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&admin=1&id=' + preset + '&camera=' + cam + '&label=' + encodeURI(lbl) + '&ts=' + (new Date()).getTime());
+    $.get('https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&admin=1&id=' + preset + '&camera=' + cam + '&label=' + encodeURI(lbl) + '&ts=' + (new Date()).getTime());
   
   // Save label...
   //if (admin)
@@ -343,7 +345,7 @@ function SetCameraPos($this, admin = false, cam = null)
   $thumb = $this.find(".pos_thumb");      
   //$thumb.attr("src", CameraURL(cam) + "/snapshot.jpg?rand=" + Math.random());
   //$thumb.attr("src", CameraURL(cam) + "/action_snapshot?" + (new Date()).getTime());
-  $thumb.attr("src", 'https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb&user=' + GetUser() + '&camera=' + cam + '&id=' + pos + '&ts=' + (new Date()).getTime());
+  $thumb.attr("src", 'https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=thumb&user=' + GetUser() + '&camera=' + cam + '&id=' + pos + '&ts=' + (new Date()).getTime());
 }
 
 function RestoreCameraPos($this)
@@ -352,7 +354,7 @@ function RestoreCameraPos($this)
   var pos = $this.attr('pos');
   var preset = $this.attr('preset');
   
-  $.get('https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=get_preset&user=' + GetUser() + '&admin=1&id=' + preset,
+  $.get('https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=get_preset&user=' + GetUser() + '&admin=1&id=' + preset,
     function(data) {
       console.log(data);
 
@@ -396,7 +398,7 @@ function RenameCameraPos($this)
     $label.text(value);
 
     //localStorage.setItem("pos_" + $this.attr('pos') + "_lbl", value);
-    $.get('https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&id=' + preset + '&camera=' + cam + '&label=' + encodeURI(value) + '&ts=' + (new Date()).getTime());
+    $.get('https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&id=' + preset + '&camera=' + cam + '&label=' + encodeURI(value) + '&ts=' + (new Date()).getTime());
   }
 }
 
@@ -417,7 +419,7 @@ function SetTimeoutCameraPos($this)
     console.log('Setting TimeOut to: ' + value);
 
     //localStorage.setItem("pos_" + $this.attr('pos') + "_lbl", value);
-    $.get('https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&id=' + preset + '&camera=' + cam + '&timeout=' + value + '&ts=' + (new Date()).getTime());
+    $.get('https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=set_preset&user=' + GetUser() + '&id=' + preset + '&camera=' + cam + '&timeout=' + value + '&ts=' + (new Date()).getTime());
   }
 }
 
@@ -765,14 +767,14 @@ function ToggleSmart() {
   if (!$(this).hasClass('live'))
   {
     //$.get('https://sequematic.com/trigger-custom-webhook/81B2670AF8/100047/' + device + '/1');
-    $.get('https://voip.linkit.xyz/chatswood/control.php?action=smartdevice&device=' + device + '&state=1');
+    $.get('https://srv-syd05.chatswoodchurch.org/?action=smartdevice&device=' + device + '&state=1');
     
     $(this).addClass('live');
   }
   else
   {
     //$.get('https://sequematic.com/trigger-custom-webhook/81B2670AF8/100047/' + device + '/0');
-    $.get('https://voip.linkit.xyz/chatswood/control.php?action=smartdevice&device=' + device + '&state=0');
+    $.get('https://srv-syd05.chatswoodchurch.org/?action=smartdevice&device=' + device + '&state=0');
 
     $(this).removeClass('live');
   }
