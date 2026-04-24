@@ -1,8 +1,8 @@
 <?php
-  // chatswood2 — LiveStream Console
-  // React prototype rewrite. Shares settings + backend endpoints with ../chatswood/.
+  // chatswood/v2 — LiveStream Console
+  // React prototype rewrite. Shares settings + backend endpoints with parent chatswood/.
 
-  $dataDir = __DIR__ . '/../chatswood/.data';
+  $dataDir = __DIR__ . '/../.data';
   $user = (isset($_GET['id']) && $_GET['id'] === 'shccc') ? 'shccc' : 'chatswood';
 
   if ($user === 'shccc') {
@@ -41,12 +41,12 @@
       presetStartIndex: <?= (int)($settings['preset_start_index'] ?? 100) ?>,
       presetAdminIndex: <?= (int)($settings['preset_admin_index'] ?? 150) ?>,
       presets:          <?= json_encode($settings['presets'] ?? []) ?>,
-      thumbEndpoint:    "../chatswood/control_thumb.php",
-      smartEndpoint:    "../chatswood/index.php"
+      thumbEndpoint:    "../control_thumb.php",
+      smartEndpoint:    "../index.php"
     };
   </script>
 
-  <script src="../chatswood/js/obs-websocket.js"></script>
+  <script src="../js/obs-websocket.js"></script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>

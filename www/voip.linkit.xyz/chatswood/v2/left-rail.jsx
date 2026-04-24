@@ -1,8 +1,8 @@
 // Left rail: LIGHTS, AUDIO, BROADCAST, PTZ SPEED.
-// Smart-device toggles call ../chatswood/index.php?action=smartdevice.
+// Smart-device toggles call ../index.php?action=smartdevice.
 // Audio radios + Record/Stream buttons call OBS via window.OBS.
 
-const SMART_ENDPOINT = (window.LS_CONFIG || {}).smartEndpoint || '../chatswood/index.php';
+const SMART_ENDPOINT = (window.LS_CONFIG || {}).smartEndpoint || '../index.php';
 
 function smartDevice(device, state) {
   const url = `${SMART_ENDPOINT}?action=smartdevice&device=${device}&state=${state ? 1 : 0}`;

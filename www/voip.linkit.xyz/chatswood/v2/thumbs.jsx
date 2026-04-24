@@ -1,9 +1,9 @@
 // Thumbnail image wrapper. Renders a real camera snapshot served by
-// ../chatswood/control_thumb.php (cache-hit first; upstream refresh handled
+// ../control_thumb.php (cache-hit first; upstream refresh handled
 // separately). Falls back to a tone-on-tone placeholder until the first
 // successful load.
 
-const THUMB_ENDPOINT = (window.LS_CONFIG || {}).thumbEndpoint || '../chatswood/control_thumb.php';
+const THUMB_ENDPOINT = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
 
 // Build a cached-thumbnail URL. `presetId` is the absolute preset index
 // (preset_start_index + slot), matching how control_thumb.php stores them.

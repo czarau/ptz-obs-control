@@ -37,7 +37,7 @@ function presetFor(slot) {
 }
 
 function recallPreset(preset) {
-  const endpoint = window.LS_CONFIG?.thumbEndpoint || '../chatswood/control_thumb.php';
+  const endpoint = window.LS_CONFIG?.thumbEndpoint || '../control_thumb.php';
   // Switch OBS scene to the camera that holds this preset
   if (window.OBS) {
     const sceneName = CAM_SCENE[preset.camera];

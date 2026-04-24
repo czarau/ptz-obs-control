@@ -1,5 +1,5 @@
 // Thin wrapper around OBSWebSocket v5. Each call opens a fresh connection
-// (matches the pattern in ../chatswood/control_v2.js). All functions return
+// (matches the pattern in ../control_v2.js). All functions return
 // Promises so the React layer can chain UI updates.
 
 const OBS = (() => {
