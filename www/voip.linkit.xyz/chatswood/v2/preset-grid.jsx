@@ -387,18 +387,23 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
   // Snapshot the camera's current view into the given thumb slot. Used
   // whenever a camera is about to leave its "at-position" preset so the
   // stored thumbnail stays in sync with what the camera was showing.
+  //
+  // Goes through control_thumb.php?cmd=thumb — which pulls a fresh
+  // action_snapshot from the camera (with digest auth) and writes it to
+  // thumbs/{presetId}.jpg server-side. Returns a Promise; callers should
+  // await this before issuing a move command so the snapshot completes
+  // BEFORE the camera starts repositioning.
   const snapshotActiveOnCam = (cam) => {
     const currentId = activeByCamRef.current[cam];
-    if (!currentId) return;
+    if (!currentId) return Promise.resolve();
     const m = currentId.match(/-(\d+)$/);
-    if (!m) return;
+    if (!m) return Promise.resolve();
     const slot = parseInt(m[1], 10);
-    const camN = Number(cam);
-    if (window.capturePresetThumb) {
-      window.capturePresetThumb(camN, slot).then(ok => {
-        if (ok) setRefreshMap(rm => ({ ...rm, [currentId]: Date.now() }));
-      });
-    }
+    const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + slot;
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+    return fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
+      .then(() => setRefreshMap(rm => ({ ...rm, [currentId]: Date.now() })))
+      .catch(() => {});
   };
 
   // Clear the "at-position" marker for a camera whenever it's manually jogged
@@ -502,21 +507,21 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     menu.open(e, items);
   };
 
-  const onThumbClick = (id, preset) => {
+  const onThumbClick = async (id, preset) => {
     const cam = String(preset.camera);
 
     // Second click on the preset already armed on this camera → go LIVE
     if (activeByCam[cam] === id) {
       takeLive(preset);
       setLiveCamFromNumber && setLiveCamFromNumber(preset.camera);
-      // liveId update happens in the useEffect above when liveCamera changes.
       return;
     }
 
-    // Before sending the camera elsewhere, capture whatever it's currently
-    // showing so the outgoing preset's thumb stays accurate. Safe no-op if
-    // nothing was armed on this camera.
-    snapshotActiveOnCam(cam);
+    // Before sending the camera elsewhere, pull a fresh snapshot of what
+    // it's currently showing and cache it against the outgoing preset.
+    // Awaited so the server gets the snapshot from the camera BEFORE the
+    // move command races through. Safe no-op if nothing was armed.
+    await snapshotActiveOnCam(cam);
 
     // First click → send the camera to this preset
     moveCamera(preset);

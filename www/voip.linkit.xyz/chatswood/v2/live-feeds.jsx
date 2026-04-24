@@ -17,32 +17,6 @@ const CAM_BASE = {
   3: 'https://srv-syd05.chatswoodchurch.org:8808',
 };
 
-// Capture the current frame from a camera's live WebRTC <video> and POST it
-// to control_thumb.php?cmd=save_thumb so the preset thumbnail reflects what
-// the camera was actually showing *before* we send it somewhere else.
-// Fire-and-forget; resolves to false if no video or encoding failed.
-window.capturePresetThumb = function (camera, slot) {
-  try {
-    const video = (window.LIVE_VIDEOS || {})[camera];
-    if (!video || !video.videoWidth) return Promise.resolve(false);
-    const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(slot);
-    const w = 480;
-    const h = Math.round(w * video.videoHeight / video.videoWidth) || 270;
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-    return new Promise(resolve => {
-      canvas.toBlob(blob => {
-        if (!blob) { resolve(false); return; }
-        const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-        fetch(`${endpoint}?cmd=save_thumb&id=${presetId}`, { method: 'POST', body: blob })
-          .then(() => resolve(true))
-          .catch(() => resolve(false));
-      }, 'image/jpeg', 0.85);
-    });
-  } catch (_) { return Promise.resolve(false); }
-};
-
 // Shared brief-pulse helper for keyboard shortcuts and per-arrow wheel.
 // Goes through the PHP proxy so digest-auth is handled server-side.
 const _pulseTimers = {};
@@ -164,18 +138,6 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
     return () => { try { pc && pc.close(); } catch (_) {} };
   }, [cam.id]);
 
-  // Expose this camera's <video> element globally so the preset grid can
-  // snapshot the current frame before the camera is told to move elsewhere.
-  useEffectLF(() => {
-    if (!cam.camera || cam.camera === 0) return;
-    if (!window.LIVE_VIDEOS) window.LIVE_VIDEOS = {};
-    window.LIVE_VIDEOS[cam.camera] = videoRef.current;
-    return () => {
-      if (window.LIVE_VIDEOS && window.LIVE_VIDEOS[cam.camera] === videoRef.current) {
-        delete window.LIVE_VIDEOS[cam.camera];
-      }
-    };
-  }, [cam.camera]);
 
   return (
     <div className={"feed" + (onAir ? " feed-onair" : "")} onContextMenu={onContextMenu}>

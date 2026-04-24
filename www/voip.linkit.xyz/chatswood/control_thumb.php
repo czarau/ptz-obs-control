@@ -213,22 +213,6 @@
     header('Content-Type: application/json');
     echo json_encode(['ok' => true, 'home' => $settings['home']]);
   }
-  elseif ($_GET['cmd'] == 'save_thumb')
-  {
-    // Accept a JPEG body (POST) and store it at thumbs/{id}.jpg — used by
-    // the browser to snapshot a preset's current view from the WebRTC
-    // <video> element before the camera is sent elsewhere, so the thumb
-    // stays in sync with what the camera was actually showing.
-    //   POST /control_thumb.php?cmd=save_thumb&id=<presetId>
-    //   body: raw image/jpeg bytes
-    $id = $_GET['id'] ?? '';
-    if (!is_numeric($id)) { http_response_code(400); die; }
-    $body = file_get_contents('php://input');
-    if ($body === false || strlen($body) < 500) { http_response_code(400); die; }
-    file_put_contents("thumbs/{$id}.jpg", $body);
-    header('Content-Type: application/json');
-    echo json_encode(['ok' => true, 'id' => (int)$id, 'bytes' => strlen($body)]);
-  }
   elseif ($_GET['cmd'] == 'thumb_cache')
   {
     // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb_cache&id=100&ts=0
