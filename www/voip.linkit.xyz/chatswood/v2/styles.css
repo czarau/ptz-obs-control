@@ -13,8 +13,16 @@
   --text-2: #a0a0a8;
   --text-3: #6a6a72;
   --text-4: #48484f;
-  --live: #22c55e;
+  --live: #22c55e;                          /* generic "on/active" green (toggles, meters, LEDs) */
   --live-dim: rgba(34, 197, 94, 0.18);
+  /* Broadcast tally convention: scene ON AIR is red, scene CUED is green.
+   * Kept distinct from --live so generic "active/on" UI (toggle LEDs,
+   * audio-meter greens, joystick-hover, etc.) stays green — only the
+   * camera/scene state indicators get the red/green tally semantics. */
+  --onair: #dc2626;                         /* tally red — scene is on program */
+  --onair-dim: rgba(220, 38, 38, 0.18);
+  --cue: #22c55e;                           /* tally green — scene is cued / next up */
+  --cue-dim: rgba(34, 197, 94, 0.18);
   --warn: #f59e0b;
   --danger: #ef4444;
   --rec: #ef4444;
@@ -295,8 +303,8 @@ em { font-style: normal; }
   min-height: 0;
 }
 .thumb:hover { border-color: var(--border-strong); }
-.thumb.selected { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 12px rgba(245,158,11,0.2); }
-.thumb.onair { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 16px rgba(34,197,94,0.25); }
+.thumb.selected { border-color: var(--cue); box-shadow: 0 0 0 1px var(--cue), 0 0 12px rgba(34,197,94,0.2); }
+.thumb.onair { border-color: var(--onair); box-shadow: 0 0 0 1px var(--onair), 0 0 16px rgba(220,38,38,0.3); }
 .thumb.in-motion { animation: thumb-motion 0.55s ease-in-out infinite alternate; }
 /* Drop hover — a live feed is being dragged over this thumb; release to save */
 .thumb.drag-over { border-color: #60a5fa; box-shadow: 0 0 0 2px #60a5fa, 0 0 18px rgba(96,165,250,0.5); }
@@ -322,8 +330,8 @@ em { font-style: normal; }
 }
 .thumb-img { position: relative; background: #000; overflow: hidden; flex: 1 1 auto; min-height: 0; width: 100%; aspect-ratio: 16 / 9; }
 .thumb-img svg { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
-.thumb-livebadge { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--live); color: #04130a; padding: 1px 5px; border-radius: 3px; }
-.thumb-cuebadge  { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--warn); color: #1a1205; padding: 1px 5px; border-radius: 3px; }
+.thumb-livebadge { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--onair); color: #fff; padding: 1px 5px; border-radius: 3px; }
+.thumb-cuebadge  { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--cue); color: #04130a; padding: 1px 5px; border-radius: 3px; }
 .thumb-timer { position: absolute; top: 4px; right: 4px; font-family: var(--font-mono); font-size: 9.5px; color: var(--text); background: rgba(0,0,0,0.6); padding: 1px 5px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.08); }
 /* Hover-only warning: the preset's camera is currently on program. The
  * operator is about to move a camera viewers are watching. Large red
@@ -334,7 +342,7 @@ em { font-style: normal; }
   align-items: center; justify-content: center;
   font-family: var(--font-mono); font-size: 22px; font-weight: 800;
   letter-spacing: 0.18em; color: #fff;
-  background: rgba(220, 38, 38, 0.32);
+  background: rgba(220, 38, 38, 0.12);
   text-shadow: 0 0 10px rgba(0,0,0,0.6);
   pointer-events: none;
   z-index: 4;
@@ -342,8 +350,8 @@ em { font-style: normal; }
 .thumb:hover .thumb-livewarn { display: flex; }
 .thumb-meta { display: flex; align-items: center; gap: 6px; padding: 5px 7px; height: 28px; flex: 0 0 28px; box-sizing: border-box; }
 .thumb-num { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--text-3); background: var(--surf-3); padding: 1px 5px; border-radius: 3px; min-width: 16px; text-align: center; }
-.thumb-num.num-live { color: #04130a; background: var(--live); }
-.thumb.selected .thumb-num { color: #1a1205; background: var(--warn); }
+.thumb-num.num-live { color: #fff; background: var(--onair); }
+.thumb.selected .thumb-num { color: #04130a; background: var(--cue); }
 .thumb-label { font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- FEED ROW ---------- */
@@ -364,18 +372,18 @@ em { font-style: normal; }
 }
 .feed .feed-img { flex: 0 0 auto; }
 .feed .ptzpad { margin-top: auto; }
-.feed-onair { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 20px rgba(34,197,94,0.2); }
+.feed-onair { border-color: var(--onair); box-shadow: 0 0 0 1px var(--onair), 0 0 20px rgba(220,38,38,0.25); }
 /* Cued scene: orange border and CUE badge, matches the preset-thumb CUE
  * convention so operators recognise it instantly. */
-.feed-cue { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 14px rgba(245,158,11,0.25); }
+.feed-cue { border-color: var(--cue); box-shadow: 0 0 0 1px var(--cue), 0 0 14px rgba(34,197,94,0.25); }
 .feed-cuebadge {
   display: inline-flex; align-items: center;
   font-family: var(--font-mono); font-size: 10px; font-weight: 700;
   letter-spacing: 0.1em;
-  background: var(--warn); color: #1a1205;
+  background: var(--cue); color: #04130a;
   padding: 1px 6px; border-radius: 3px;
 }
-.thumb-num.num-cue { color: var(--warn); }
+.thumb-num.num-cue { color: var(--cue); }
 /* Hide the Chrome/Edge hover picture-in-picture button that overlays the
  * top-right of any playing <video>. disablePictureInPicture on the element
  * itself handles Firefox + most Chromium; the pseudo-element covers Safari
@@ -388,8 +396,8 @@ em { font-style: normal; }
 .feed-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .feed-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text); }
 .feed-hint { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
-.feed-live { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--live); }
-.feed-live > span { width: 7px; height: 7px; border-radius: 999px; background: var(--live); animation: pulse 1.2s ease-in-out infinite; }
+.feed-live { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--onair); }
+.feed-live > span { width: 7px; height: 7px; border-radius: 999px; background: var(--onair); animation: pulse 1.2s ease-in-out infinite; }
 
 .feed-img { position: relative; background: #000; display: block; overflow: hidden; width: 100%; aspect-ratio: 16 / 9; flex: 0 0 auto; }
 .feed-img svg { width: 100%; height: 100%; display: block; position: absolute; inset: 0; }
