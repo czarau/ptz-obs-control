@@ -29,7 +29,12 @@
       "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=2\")",
       "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=3\")",
       "Bash(curl -sk --max-time 20 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=focus_auto&camera=1\")",
-      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/v2/styles.css?v=99\")"
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/v2/styles.css?v=99\")",
+      "Bash(curl -sk -w \"\\\\nhttp=%{http_code} time=%{time_total}s\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&home\")",
+      "Bash(curl -sk -w \"\\\\nhttp=%{http_code} time=%{time_total}s\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&100\")",
+      "Bash(curl -sk -u \"admin:admin\" --max-time 5 -w \"http=%{http_code}\" \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&home\" -o /dev/null)",
+      "Bash(curl -sk -w \"\\\\nhttp=%{http_code} size=%{size_download}\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/action_snapshot\" -o /dev/null)",
+      "Bash(curl -sk -u \"admin:admin\" --digest -w \"\\\\nhttp=%{http_code} size=%{size_download}\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/action_snapshot\" -o /dev/null)"
     ]
   }
 }

@@ -52,12 +52,10 @@ function presetFor(slot) {
 }
 
 function moveCamera(preset) {
-  // Same call shape as the legacy chatswood UI:
-  //   https://srv-syd05...:880N/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&<presetId>
-  const base = CAM_BASE_PG[preset.camera];
-  if (base) {
-    fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${preset.presetId}`, { mode: 'no-cors' }).catch(() => {});
-  }
+  // Routes through the PHP proxy (for digest-auth on firmware 6.3.45+).
+  const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+  const q = encodeURIComponent(`ptzcmd&poscall&${preset.presetId}`);
+  fetch(`${endpoint}?cmd=cgi&camera=${preset.camera}&q=${q}`).catch(() => {});
   window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`, `preset ${preset.presetId}`);
 }
 
@@ -82,10 +80,9 @@ const PRESET_ACTIONS = {
       : (window.LS_CONFIG?.presetStartIndex ?? 100);
     const presetId = startIndex + preset.slot;
 
-    const base = CAM_BASE_PG[cam];
-    if (base) {
-      fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&posset&${presetId}`, { mode: 'no-cors' }).catch(() => {});
-    }
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+    const q = encodeURIComponent(`ptzcmd&posset&${presetId}`);
+    fetch(`${endpoint}?cmd=cgi&camera=${cam}&q=${q}`).catch(() => {});
 
     const params = new URLSearchParams({
       cmd: 'set_preset',
@@ -178,13 +175,11 @@ const PRESET_ACTIONS = {
     const cam = def.camera;
     const adminId = (window.LS_CONFIG?.presetAdminIndex ?? 150) + preset.slot;
     const userId  = (window.LS_CONFIG?.presetStartIndex ?? 100) + preset.slot;
-    const base = CAM_BASE_PG[cam];
-    if (base) {
-      fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${adminId}`, { mode: 'no-cors' }).catch(() => {});
-      // Wait for the camera to arrive before snapshotting back to the user slot.
-      await new Promise(r => setTimeout(r, 5000));
-      fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&posset&${userId}`, { mode: 'no-cors' }).catch(() => {});
-    }
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+    fetch(`${endpoint}?cmd=cgi&camera=${cam}&q=${encodeURIComponent(`ptzcmd&poscall&${adminId}`)}`).catch(() => {});
+    // Wait for the camera to arrive before snapshotting back to the user slot.
+    await new Promise(r => setTimeout(r, 5000));
+    fetch(`${endpoint}?cmd=cgi&camera=${cam}&q=${encodeURIComponent(`ptzcmd&posset&${userId}`)}`).catch(() => {});
     const params = new URLSearchParams({
       cmd: 'set_preset',
       user: PRESET_ACTIONS.user(),

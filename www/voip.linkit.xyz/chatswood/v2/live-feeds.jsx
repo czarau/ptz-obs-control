@@ -18,35 +18,38 @@ const CAM_BASE = {
 };
 
 // Shared brief-pulse helper for keyboard shortcuts and per-arrow wheel.
-// Fires `startQ` on the camera CGI and schedules `stopQ` PULSE_MS later;
-// back-to-back calls reset the pending stop timer for that (camera, stopQ)
-// pair so rapid key-repeats / wheel ticks chain smoothly.
+// Goes through the PHP proxy so digest-auth is handled server-side.
 const _pulseTimers = {};
 function pulseCgi(camera, startQ, stopQ, ms) {
-  const base = CAM_BASE[camera];
-  if (!base) return;
-  fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&${startQ}`, { mode: 'no-cors' }).catch(() => {});
+  if (!camera || camera < 1 || camera > 3) return;
+  const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+  fetch(`${endpoint}?cmd=cgi&camera=${camera}&q=${encodeURIComponent('ptzcmd&' + startQ)}`).catch(() => {});
   const key = `${camera}:${stopQ}`;
   if (_pulseTimers[key]) clearTimeout(_pulseTimers[key]);
   _pulseTimers[key] = setTimeout(() => {
-    fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&${stopQ}`, { mode: 'no-cors' }).catch(() => {});
+    fetch(`${endpoint}?cmd=cgi&camera=${camera}&q=${encodeURIComponent('ptzcmd&' + stopQ)}`).catch(() => {});
     _pulseTimers[key] = null;
   }, ms || 180);
-  // Invalidate the preset CUE marker on manual pan/tilt — same contract as ptzCmd().
   if (stopQ === 'ptzstop') {
     window.dispatchEvent(new CustomEvent('ptz:manual-move', { detail: { camera } }));
   }
 }
 window.pulseCgi = pulseCgi;
 
+// All camera CGI calls go through control_thumb.php?cmd=cgi on the server,
+// which handles the digest-auth that PTZOptics firmware 6.3.45+ requires.
+// Browser can't easily do digest auth cross-origin, so this is the cleanest
+// path and lets us keep one credential cache in PHP.
 function ptzCmd(camera, query) {
-  const base = CAM_BASE[camera];
-  if (!base) return;
-  // no-cors: the cameras don't return CORS headers but accept the request.
-  fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&${query}`, { mode: 'no-cors' }).catch(() => {});
-  // Any manual jog (that isn't a stop) invalidates the "at-position" marker
-  // for this camera — notify the preset grid so it clears the selected state.
-  if (!/stop$/i.test(query)) {
+  if (!camera || camera < 1 || camera > 3) return;
+  const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+  const q = encodeURIComponent('ptzcmd&' + query);
+  fetch(`${endpoint}?cmd=cgi&camera=${camera}&q=${q}`).catch(() => {});
+  // Any manual jog (pan/tilt/zoom/focus movement) invalidates the "at-position"
+  // marker for this camera. Preset recalls (poscall) and stops are not manual
+  // — they either set or don't disturb the CUE state.
+  const isManual = /^(left|right|up|down|leftup|rightup|leftdown|rightdown|zoomin|zoomout|focusin|focusout)\b/i.test(query);
+  if (isManual) {
     window.dispatchEvent(new CustomEvent('ptz:manual-move', { detail: { camera } }));
   }
 }
@@ -255,7 +258,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
             const home = (window.LS_CONFIG?.home || {})[String(camera)];
             if (home != null) {
               const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(home);
-              fetch(`${CAM_BASE[camera]}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${presetId}`, { mode: 'no-cors' }).catch(() => {});
+              ptzCmd(camera, `poscall&${presetId}`);
               window.Log?.add('camera', `Home · Cam ${camera}`, `slot ${home}`);
             } else {
               ptzCmd(camera, 'home');

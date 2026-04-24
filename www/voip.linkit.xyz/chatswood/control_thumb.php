@@ -30,7 +30,29 @@
     }
     return null;
   }
-  
+
+  // PTZOptics firmware 6.3.45+ requires digest auth on every /cgi-bin/ and
+  // /action_snapshot call. Default factory creds are admin:admin.
+  define('CAM_USER', 'admin');
+  define('CAM_PASS', 'admin');
+
+  // Curl wrapper with digest auth. Returns [body, http_code].
+  function CameraHttpGet($url, $timeout = 5)
+  {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPAUTH,       CURLAUTH_DIGEST);
+    curl_setopt($ch, CURLOPT_USERPWD,        CAM_USER . ':' . CAM_PASS);
+    curl_setopt($ch, CURLOPT_TIMEOUT,        $timeout);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$body, $code];
+  }
+
   function GetCameraURL($cam)
   { 
     //netsh interface portproxy show all
@@ -53,33 +75,53 @@
   
   if ($_GET['cmd'] == 'init')
   {
-    file_get_contents(GetCameraURL(1).'/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
-    file_get_contents(GetCameraURL(2).'/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
-    file_get_contents(GetCameraURL(3).'/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
+    CameraHttpGet(GetCameraURL(1).'/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
+    CameraHttpGet(GetCameraURL(2).'/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
+    CameraHttpGet(GetCameraURL(3).'/cgi-bin/snapshot.cgi?post_snapshot_conf&resolution=480x300');
   }
   elseif ($_GET['cmd'] == 'thumb')
   {
     // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb&camera=3&id=0&ts=0
-    // http://10.241.57.96:8806
-
     $cam = $_GET['camera'];
-    $id = $_GET['id'];
-    $d = date_create()->getTimestamp();
-    
-    if (!is_numeric($id))
-      die;
-    
-    $cam_url = GetCameraURL($cam);
-    $jpg = file_get_contents($cam_url."/action_snapshot?".$d);
-    
+    $id  = $_GET['id'];
+    $d   = date_create()->getTimestamp();
+
+    if (!is_numeric($id)) die;
+
+    list($jpg, $code) = CameraHttpGet(GetCameraURL($cam)."/action_snapshot?".$d);
+
     header('Content-Type: image/jpeg');
-    if (strlen($jpg) > 0)
-    {
+    if ($code === 200 && strlen($jpg) > 0) {
       file_put_contents("thumbs/{$id}.jpg", $jpg);
       echo $jpg;
-    }
-    else
+    } else {
       echo file_get_contents("thumbs/_blank.jpg");
+    }
+  }
+  elseif ($_GET['cmd'] == 'cgi')
+  {
+    // Browser-friendly passthrough for the camera's /cgi-bin/ptzctrl.cgi
+    // and similar endpoints. Required since firmware 6.3.45 added digest
+    // auth that we can't easily do from the browser directly.
+    //   ?cmd=cgi&camera=1&q=ptzcmd&left&10&10
+    //   ?cmd=cgi&camera=2&q=ptzcmd&poscall&105
+    $cam = (int)$_GET['camera'];
+    if ($cam < 1 || $cam > 3) { http_response_code(400); die; }
+    $q = isset($_GET['q']) ? (string)$_GET['q'] : '';
+    // Pass through any extra query fragments appended after "q" as-is.
+    $qs = [];
+    foreach ($_GET as $k => $v) {
+      if ($k === 'cmd' || $k === 'camera' || $k === 'q' || $k === 'ts') continue;
+      // PHP already URL-decoded these — preserve them by re-encoding.
+      $qs[] = (is_numeric($k) ? (string)$k : rawurlencode($k))
+        . ($v === '' ? '' : '=' . rawurlencode((string)$v));
+    }
+    $full = GetCameraURL($cam) . '/cgi-bin/ptzctrl.cgi?' . $q
+          . (count($qs) ? '&' . implode('&', $qs) : '');
+    list($body, $code) = CameraHttpGet($full, 3);
+    header('Content-Type: application/json');
+    if ($code === 200) echo $body;
+    else echo json_encode(['error' => 'camera returned '.$code, 'url' => $full]);
   }
   elseif ($_GET['cmd'] == 'set_preset')
   {
