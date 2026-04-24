@@ -151,7 +151,7 @@ function App() {
 
   return (
     <div className="app">
-      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} />
+      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} emergencyLive={liveCamId === 'emergency'} />
       <TopBar
         cueIdx={cueIdx}
         setCueIdx={setCueIdx}

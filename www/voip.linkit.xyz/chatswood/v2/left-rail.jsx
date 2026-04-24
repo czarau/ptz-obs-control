@@ -12,7 +12,7 @@ function smartDevice(device, state) {
 const DEVICE_LABEL = { SPOTS: 'Spots', STAGE: 'Stage', FRONT: 'Front', LG_LEFT: 'TV Left', LG_RIGHT: 'TV Right' };
 const AUDIO_LABEL  = { church: 'Church Mix', video: 'Video Mix', backup: 'Video Mix (Backup)' };
 
-function LeftRail({ state, setState, onEmergency, admin, setAdmin }) {
+function LeftRail({ state, setState, onEmergency, admin, setAdmin, emergencyLive }) {
   const toggleDevice = (key, device) => {
     const next = !state[key];
     setState(s => ({ ...s, [key]: next }));
@@ -69,7 +69,7 @@ function LeftRail({ state, setState, onEmergency, admin, setAdmin }) {
       </Section>
 
       <Section title="Broadcast">
-        <BigButton label="Emergency" tone="danger" icon="alert" onClick={onEmergency}/>
+        <BigButton label="Emergency" tone={emergencyLive ? "active-emergency" : "danger"} icon="alert" sub={emergencyLive ? "ON AIR" : undefined} onClick={onEmergency}/>
         <BigButton label="Record" tone={state.recording ? "active-record" : "default"} icon="rec" sub={state.recording ? "recording" : "stopped"} onClick={toggleRecord}/>
         <BigButton label="Stream" tone={state.streaming ? "active-live" : "default"}   icon="stream" sub={state.streaming ? "LIVE" : "offline"} onClick={toggleStream}/>
       </Section>

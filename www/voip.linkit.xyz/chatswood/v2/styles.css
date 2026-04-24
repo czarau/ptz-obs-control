@@ -187,7 +187,12 @@ em { font-style: normal; }
 .bigbtn-label { font-weight: 600; font-size: 12.5px; letter-spacing: -0.005em; }
 .bigbtn-sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
 .bigbtn-danger .bigbtn-icon { background: rgba(239,68,68,0.12); color: var(--danger); }
-.bigbtn-danger:hover { border-color: rgba(239,68,68,0.4); }
+.bigbtn-danger .bigbtn-label { color: var(--danger); font-weight: 700; }
+.bigbtn-danger:hover { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
+.bigbtn-active-emergency { background: rgba(239,68,68,0.18); border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger), 0 0 18px rgba(239,68,68,0.35); }
+.bigbtn-active-emergency .bigbtn-icon { background: var(--danger); color: white; animation: pulse 1s ease-in-out infinite; }
+.bigbtn-active-emergency .bigbtn-label { color: var(--danger); font-weight: 800; }
+.bigbtn-active-emergency .bigbtn-sub { color: var(--danger); font-weight: 700; letter-spacing: 0.12em; }
 .bigbtn-active-record { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.35); }
 .bigbtn-active-record .bigbtn-icon { background: var(--rec); color: white; animation: pulse 1.6s ease-in-out infinite; }
 .bigbtn-active-record .bigbtn-sub { color: var(--rec); }
