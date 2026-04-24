@@ -247,6 +247,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
           <button className="joy-arrow joy-b"  aria-label="Tilt down"     {...pan('b')}><Arrow d="b"/></button>
           <button className="joy-arrow joy-bl" aria-label="Pan down-left" {...pan('bl')}><Arrow d="bl"/></button>
           <button className="joy-arrow joy-l"  aria-label="Pan left"      {...pan('l')}><Arrow d="l"/></button>
+          {/* HOME + joy arrows — track toggle sits below this ring */}
           <button className="joy-center" aria-label="Home" onClick={() => {
             // If the user has flagged a preset as this camera's Home via the
             // preset context menu, recall that preset. Otherwise fall back to
@@ -264,6 +265,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
             <span className="joy-center-label">HOME</span>
           </button>
         </div>
+        {camera === 1 && <FollowFaceToggle camera={camera} />}
       </div>
       <div className="ptzpad-controls">
         <div className="ctrl-group" onWheel={onZoomWheel}>
@@ -281,7 +283,6 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
           </div>
           <button className="ctrl-auto" aria-label="Auto focus" onClick={() => focusCmd(camera, 'focus_auto')}>AUTO</button>
         </div>
-        {camera === 1 && <FollowFaceToggle camera={camera} />}
       </div>
     </div>
   );
@@ -290,7 +291,8 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
 // Face-tracking toggle. Calls the CMP (PTZOptics Camera Management Platform)
 // running on srv-syd05:8810 via the existing control_thumb.php?cmd=face
 // wrapper. Local state — the CMP doesn't expose a status endpoint, so toggles
-// are optimistic and persist only until the page reloads.
+// are optimistic and persist only until the page reloads. Sits compact under
+// the joystick ring so it reads as "part of the PTZ".
 function FollowFaceToggle({ camera }) {
   const [on, setOn] = useStateLF(false);
   const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
@@ -303,18 +305,15 @@ function FollowFaceToggle({ camera }) {
   };
 
   return (
-    <div className="ctrl-group">
-      <div className="ctrl-label">FOLLOW</div>
-      <button
-        className={"ctrl-track" + (on ? " on" : "")}
-        aria-pressed={on}
-        onClick={toggle}
-        title={on ? 'Stop face tracking' : 'Start face tracking'}
-      >
-        <span className="ctrl-track-dot" />
-        <em>{on ? 'TRACKING' : 'FACE'}</em>
-      </button>
-    </div>
+    <button
+      className={"ctrl-track" + (on ? " on" : "")}
+      aria-pressed={on}
+      onClick={toggle}
+      title={on ? 'Stop face tracking' : 'Start face tracking'}
+    >
+      <span className="ctrl-track-dot" />
+      <em>{on ? 'TRACKING' : 'FOLLOW FACE'}</em>
+    </button>
   );
 }
 
