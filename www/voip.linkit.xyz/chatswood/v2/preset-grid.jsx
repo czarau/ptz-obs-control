@@ -76,17 +76,41 @@ function moveCamera(preset) {
     });
     if (preset.zoom  != null) params.set('zoom',  String(preset.zoom));
     if (preset.focus != null) params.set('focus', String(preset.focus));
-    fetch(`${endpoint}?${params}`).catch(() => {});
     window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`,
       `abs p=${preset.pan} t=${preset.tilt} z=${preset.zoom ?? '-'} f=${preset.focus ?? '-'}`);
+    // Surface any server-side failure to the activity log — otherwise a
+    // broken goto_abs looks indistinguishable from a working one.
+    fetch(`${endpoint}?${params}`)
+      .then(r => r.text())
+      .then(body => {
+        const trimmed = (body || '').trim();
+        let data = null;
+        try { data = JSON.parse(trimmed); } catch (_) {}
+        if (data && data.error) {
+          window.Log?.add('error', `goto_abs failed · Cam ${preset.camera}`,
+            `${data.error}${data.stderr ? ' · ' + String(data.stderr).slice(0, 160) : ''}`);
+        } else if (!trimmed) {
+          window.Log?.add('error', `goto_abs empty response · Cam ${preset.camera}`,
+            'PHP/python returned nothing — check cam_control.py stderr');
+        }
+      })
+      .catch(err => {
+        window.Log?.add('error', `goto_abs fetch error · Cam ${preset.camera}`, String(err));
+      });
   } else {
-    // Legacy fallback — camera-side preset slot. Only hit if a preset
-    // hasn't been re-saved since the migration to abs positions (or on
-    // new sites that still use onboard slots).
+    // No abs position stored. The camera-side preset slots were wiped by the
+    // 6.3.45 firmware upgrade, so falling back to poscall won't do anything
+    // useful. Flag loudly so the operator knows to re-capture the position
+    // (right-click → Save Camera X, or drag a live feed onto the thumb).
+    // Still fire the legacy poscall for back-compat on sites that haven't
+    // migrated — it's a no-op on 6.3.45+.
     const q = encodeURIComponent(`ptzcmd&poscall&${preset.presetId}`);
     fetch(`${endpoint}?cmd=cgi&camera=${preset.camera}&q=${q}`).catch(() => {});
-    window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`,
-      `slot ${preset.presetId} (legacy)`);
+    window.Log?.add(
+      'error',
+      `No saved position · Cam ${preset.camera} · ${preset.label}`,
+      `Right-click → Save Camera ${preset.camera === '1' ? 'Back' : preset.camera === '2' ? 'Left' : 'Right'} to capture.`
+    );
   }
 }
 
@@ -736,7 +760,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         window.Log?.add(
           'camera',
           `Arrived · Cam ${preset.camera} · ${preset.label}`,
-          `pan=${pos.pan} tilt=${pos.tilt} zoom=${pos.zoom} focus=${pos.focus}`
+          `p=${pos.pan} t=${pos.tilt} z=${pos.zoom} f=${pos.focus}`
         );
       } else {
         window.Log?.add('camera', `Arrived · Cam ${preset.camera} · ${preset.label}`);

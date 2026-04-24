@@ -2,6 +2,13 @@
   // chatswood/v2 — LiveStream Console
   // React prototype rewrite. Shares settings + backend endpoints with parent chatswood/.
 
+  // Cache-buster for all local JS/JSX/CSS assets. Browsers aggressively cache
+  // .jsx files (Babel-compiled inline) and without a query string you end up
+  // running stale code indefinitely — e.g. a preset-grid missing the
+  // goto_abs path keeps firing poscall on a firmware-wiped camera. Bump this
+  // whenever you ship a change to any asset in this directory.
+  $ASSET_VER = '7';
+
   $dataDir = __DIR__ . '/../.data';
   $user = (isset($_GET['id']) && $_GET['id'] === 'shccc') ? 'shccc' : 'chatswood';
 
@@ -41,7 +48,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=6"/>
+  <link rel="stylesheet" href="styles.css?v=<?= $ASSET_VER ?>"/>
 </head>
 <body>
   <div id="root"></div>
@@ -69,22 +76,22 @@
   </script>
 
   <script src="../js/obs-websocket.js"></script>
-  <script src="webrtc-client.js"></script>
+  <script src="webrtc-client.js?v=<?= $ASSET_VER ?>"></script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
 
-  <script src="activity-log.js"></script>
-  <script src="obs-client.js"></script>
-  <script src="obs-meters.js"></script>
-  <script src="ptz-state.js"></script>
-  <script type="text/babel" src="thumbs.jsx"></script>
-  <script type="text/babel" src="context-menu.jsx"></script>
-  <script type="text/babel" src="left-rail.jsx"></script>
-  <script type="text/babel" src="preset-grid.jsx"></script>
-  <script type="text/babel" src="live-feeds.jsx"></script>
-  <script type="text/babel" src="topbar.jsx"></script>
-  <script type="text/babel" src="activity-panel.jsx"></script>
-  <script type="text/babel" src="app.jsx"></script>
+  <script src="activity-log.js?v=<?= $ASSET_VER ?>"></script>
+  <script src="obs-client.js?v=<?= $ASSET_VER ?>"></script>
+  <script src="obs-meters.js?v=<?= $ASSET_VER ?>"></script>
+  <script src="ptz-state.js?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="thumbs.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="context-menu.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="left-rail.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="preset-grid.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="live-feeds.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="topbar.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="activity-panel.jsx?v=<?= $ASSET_VER ?>"></script>
+  <script type="text/babel" src="app.jsx?v=<?= $ASSET_VER ?>"></script>
 </body>
 </html>
