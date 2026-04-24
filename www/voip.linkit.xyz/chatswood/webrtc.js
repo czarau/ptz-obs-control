@@ -1,4 +1,5 @@
 // https://github.com/deepch/RTSPtoWeb/blob/master/docs/examples/webrtc/main.js
+// https://github.com/AlexxIT/go2rtc
 
 function startWebRTCPlay (id, url) {
   const video = $(id)[0];
@@ -25,13 +26,15 @@ function startWebRTCPlay (id, url) {
     await connection.setLocalDescription(offer)
     fetch(url, {
       method: 'POST',
-      body: new URLSearchParams({ data: btoa(connection.localDescription.sdp) })
+      //body: new URLSearchParams({ data: btoa(connection.localDescription.sdp) })
+      body: connection.localDescription.sdp
     })
       .then(response => response.text())
       .then(data => {
         try {
           connection.setRemoteDescription(
-            new RTCSessionDescription({ type: 'answer', sdp: atob(data) })
+            //new RTCSessionDescription({ type: 'answer', sdp: atob(data) })
+            new RTCSessionDescription({ type: 'answer', sdp: data })
           )
         } catch (e) {
             console.warn(e)
