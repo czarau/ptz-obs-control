@@ -106,6 +106,21 @@ function LiveFeed({ cam, onAir, onClick, ptzSpeed }) {
   );
 }
 
+// Each wheel tick fires a brief movement pulse. The PTZOptics CGI has no
+// "step" command — only continuous motion + stop — so each tick sends the
+// start command and schedules a stop PULSE_MS later. Back-to-back ticks
+// reset the stop timer so rapid scrolling feels continuous.
+const PULSE_MS = 180;
+
+function makePulser(stopCmd, sendStart) {
+  let stopTimer = null;
+  return (dir) => {
+    sendStart(dir);
+    if (stopTimer) clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => { stopCmd(); stopTimer = null; }, PULSE_MS);
+  };
+}
+
 function PTZPad({ camera, ptzSpeed = 6 }) {
   // Scale 1-10 UI speed → 1-24 camera range (pan/tilt) and 1-7 (zoom/focus)
   const panSpeed  = Math.max(1, Math.min(24, Math.round(ptzSpeed * 2.4)));
@@ -125,6 +140,31 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
   const focusStart = (kind) => ptzCmd(camera, `${kind === 'near' ? 'focusin' : 'focusout'}&${zoomSpeed}`);
   const focusStop  = () => ptzCmd(camera, 'focusstop');
 
+  // Wheel handlers — each tick = one short pulse. Use useMemo-style closures
+  // so the stop timers persist across renders.
+  const pulseZoom  = React.useMemo(() => makePulser(zoomStop,  (kind) => zoomStart(kind)),  [camera, ptzSpeed]);
+  const pulseFocus = React.useMemo(() => makePulser(focusStop, (kind) => focusStart(kind)), [camera, ptzSpeed]);
+  const pulsePan   = React.useMemo(() => makePulser(stop,      (dir)  => start(dir)),       [camera, ptzSpeed]);
+
+  const onZoomWheel = (e) => {
+    e.preventDefault();
+    pulseZoom(e.deltaY < 0 ? 'tele' : 'wide');
+  };
+  const onFocusWheel = (e) => {
+    e.preventDefault();
+    pulseFocus(e.deltaY < 0 ? 'far' : 'near');
+  };
+  // Wheel on the joystick: default = zoom (standard PTZ-controller feel).
+  // Shift+wheel = tilt (up/down).
+  const onJoyWheel = (e) => {
+    e.preventDefault();
+    if (e.shiftKey) {
+      pulsePan(e.deltaY < 0 ? 't' : 'b');
+    } else {
+      pulseZoom(e.deltaY < 0 ? 'tele' : 'wide');
+    }
+  };
+
   // Press+release handlers
   const pan = (d) => ({
     onMouseDown: () => start(d),
@@ -140,7 +180,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
 
   return (
     <div className="ptzpad">
-      <div className="ptzpad-joy" aria-label="Pan/Tilt">
+      <div className="ptzpad-joy" aria-label="Pan/Tilt" onWheel={onJoyWheel}>
         <div className="joy-ring">
           <button className="joy-arrow joy-tl" aria-label="Pan up-left"   {...pan('tl')}><Arrow d="tl"/></button>
           <button className="joy-arrow joy-t"  aria-label="Tilt up"       {...pan('t')}><Arrow d="t"/></button>
@@ -157,14 +197,14 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
         </div>
       </div>
       <div className="ptzpad-controls">
-        <div className="ctrl-group">
+        <div className="ctrl-group" onWheel={onZoomWheel}>
           <div className="ctrl-label">ZOOM</div>
           <div className="ctrl-pair">
             <button className="ctrl-btn" aria-label="Zoom wide" {...ctrl(() => zoomStart('wide'), zoomStop)}><ZoomIcon kind="wide"/><em>WIDE</em></button>
             <button className="ctrl-btn" aria-label="Zoom tele" {...ctrl(() => zoomStart('tele'), zoomStop)}><ZoomIcon kind="tele"/><em>TELE</em></button>
           </div>
         </div>
-        <div className="ctrl-group">
+        <div className="ctrl-group" onWheel={onFocusWheel}>
           <div className="ctrl-label">FOCUS</div>
           <div className="ctrl-pair">
             <button className="ctrl-btn" aria-label="Focus near" {...ctrl(() => focusStart('near'), focusStop)}><FocusIcon kind="near"/><em>NEAR</em></button>
