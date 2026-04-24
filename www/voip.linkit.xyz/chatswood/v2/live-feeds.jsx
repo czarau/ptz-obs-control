@@ -313,44 +313,63 @@ function Arrow({ d }) {
 }
 
 function DataControls() {
-  const [overlay, setOverlay] = useStateLF(null); // 'dp' | 'l3rd' | null
+  const [overlay, setOverlayState] = useStateLF(null); // 'dp' | 'l3rd' | null
+  const [slides, setSlides] = useStateLF(false);
 
-  // Sync with OBS on mount + whenever we suspect it may have changed.
+  // Sync with OBS on mount + every 5s so external changes are reflected.
   useEffectLF(() => {
     if (!window.OBS) return;
     let alive = true;
     const sync = () => {
-      window.OBS.currentOverlay().then(kind => { if (alive) setOverlay(kind); }).catch(() => {});
+      window.OBS.currentOverlay().then(kind => { if (alive) setOverlayState(kind); }).catch(() => {});
+      window.OBS.currentScene().then(scene => { if (alive) setSlides(scene === 'DP & Speaker'); }).catch(() => {});
     };
     sync();
     const id = setInterval(sync, 5000);
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  const toggle = (kind) => {
+  const toggleOverlay = (kind) => {
     const next = overlay === kind ? null : kind;
-    setOverlay(next); // optimistic
+    setOverlayState(next); // optimistic
     if (window.OBS) window.OBS.setOverlay(next).catch(() => {});
     window.Log?.add('live', next ? `Overlay → ${next === 'dp' ? 'DP' : 'Lower Third'}` : 'Overlay off');
+  };
+
+  // Slides flips the Data Projection live scene between "DP Full Screen"
+  // (the default, just the slides) and "DP & Speaker" (composite scene
+  // that keeps a speaker shot next to the slides).
+  const toggleSlides = () => {
+    const next = !slides;
+    setSlides(next); // optimistic
+    const target = next ? 'DP & Speaker' : 'DP Full Screen';
+    if (window.OBS) window.OBS.switchScene(target).catch(() => {});
+    window.Log?.add('live', `Slides ${next ? 'ON' : 'OFF'} → ${target}`);
   };
 
   return (
     <div className="data-ctrls">
       <button
         className={"datbtn" + (overlay === 'dp' ? " on" : "")}
-        onClick={() => toggle('dp')}
+        onClick={() => toggleOverlay('dp')}
       >
         {overlay === 'dp' && <span className="dot dot-green"/>}
         Overlay
       </button>
       <button
         className={"datbtn" + (overlay === 'l3rd' ? " on" : "")}
-        onClick={() => toggle('l3rd')}
+        onClick={() => toggleOverlay('l3rd')}
       >
         {overlay === 'l3rd' && <span className="dot dot-green"/>}
         Lower Third
       </button>
-      <button className="datbtn" disabled title="Not wired yet">Slides</button>
+      <button
+        className={"datbtn" + (slides ? " on" : "")}
+        onClick={toggleSlides}
+      >
+        {slides && <span className="dot dot-green"/>}
+        Slides
+      </button>
     </div>
   );
 }

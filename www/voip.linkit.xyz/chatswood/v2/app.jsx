@@ -19,6 +19,7 @@ function App() {
     'Camera 2 - Left':  'left',
     'Camera 3 - Right': 'right',
     'DP Full Screen':   'data',
+    'DP & Speaker':     'data',
     'Emergency':        'emergency',
   };
   const liveCamera = LIVE_CAM_NUM[liveCamId];
