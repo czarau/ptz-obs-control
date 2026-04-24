@@ -615,13 +615,33 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     return () => clearInterval(id);
   }, [queueRunning]);
 
+  // Grace window: after a queue take (kickoff OR advance) we need a
+  // beat for React's batched state updates + the ~1s OBS scene poll to
+  // settle before the interrupt detector starts comparing. Without it
+  // the detector can fire BEFORE takeQueueItem's setLiveCam has
+  // propagated — the freshly-started queue would self-pause
+  // immediately, which is exactly the bug a naive interrupt detector
+  // has. Grace is a timestamp; the detector skips while Date.now() is
+  // under it.
+  const GRACE_MS = 2000;
+  const queueGraceRef = useRefPG(0);
+  const bumpGrace = () => { queueGraceRef.current = Date.now() + GRACE_MS; };
+
   // When the queue is turned on, kick off the first take (unless we're
-  // resuming a paused mid-item countdown).
+  // resuming a paused mid-item countdown). Set grace BEFORE the take
+  // so the interrupt detector that runs on the same render pass doesn't
+  // race takeQueueItem's state updates.
   useEffectPG(() => {
     if (queueRunning && queueTimerRef.current === 0) {
+      bumpGrace();
       takeQueueItem(queueLiveIdxRef.current);
     }
   }, [queueRunning]);
+
+  // Grace also bumps on every advance (queueLiveIdx change) — covers
+  // auto-advance ticks, manual Skip, and any other path that changes
+  // which queue slot is live.
+  useEffectPG(() => { bumpGrace(); }, [queueLiveIdx]);
 
   // Auto-pause on operator takeover. The queue runs on two rails while
   // live:
@@ -634,12 +654,6 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
   // camera — the operator has clearly taken over. Pause the queue so
   // the next tick doesn't clobber their shot. They re-arm the queue
   // with the Running button when they're ready.
-  //
-  // Using a tiny grace window (1 tick) after takeQueueItem to let state
-  // settle — React batches the setActiveByCam / setLive from the take,
-  // but the external OBS poll that surfaces the scene change can arrive
-  // a beat later and briefly not-match.
-  const queueGraceRef = useRefPG(0);
   useEffectPG(() => {
     if (!queueRunning) return;
     if (queueGraceRef.current > Date.now()) return;
@@ -669,14 +683,6 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       }
     }
   }, [queueRunning, queueLiveIdx, liveCamera, activeByCam]);
-
-  // Wrap takeQueueItem so every advance bumps the grace window — gives
-  // the OBS poll / render batch a moment to settle before the
-  // interrupt-detector starts comparing.
-  const GRACE_MS = 1500;
-  useEffectPG(() => {
-    queueGraceRef.current = Date.now() + GRACE_MS;
-  }, [queueLiveIdx]);
 
   // Snapshot the camera's current view into the given thumb slot. Hybrid:
   //  1. Prefer the instant WebRTC path — grab a frame from the live <video>
