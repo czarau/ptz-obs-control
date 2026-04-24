@@ -352,8 +352,12 @@ em { font-style: normal; }
 .feed-data-overlay { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 8px; pointer-events: none; }
 .feed-data-label { font-family: var(--font-mono); font-size: 10px; color: #fff; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 3px; }
 
-.ptzpad { display: grid; grid-template-columns: 96px auto 1fr; gap: 12px; padding: 10px 12px; background: var(--surf-2); border-top: 1px solid var(--border); align-items: end; }
-.ptzpad-joy { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* Flex row, not a grid, so cameras without a Follow Face button don't get a
+ * ghost column between joystick and controls. Controls are pinned right via
+ * margin-left:auto; any optional middle children (Follow Face) sit next to
+ * the joystick on the left. */
+.ptzpad { display: flex; align-items: end; gap: 12px; padding: 10px 12px; background: var(--surf-2); border-top: 1px solid var(--border); }
+.ptzpad-joy { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 96px; }
 .joy-ring { position: relative; width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, var(--surf-4) 0%, var(--surf-3) 70%); border: 1px solid var(--border-2); box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 2px 6px rgba(0,0,0,0.3); }
 .joy-arrow { position: absolute; width: 20px; height: 20px; display: grid; place-items: center; color: var(--text-2); background: transparent; border-radius: 4px; transition: all 100ms; }
 .joy-arrow:hover { color: var(--text); background: rgba(255,255,255,0.06); }
@@ -371,7 +375,7 @@ em { font-style: normal; }
 .joy-center-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); }
 .joy-center-label { font-family: var(--font-mono); font-size: 7px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-3); }
 
-.ptzpad-controls { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 120px; justify-self: end; }
+.ptzpad-controls { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 120px; margin-left: auto; }
 .ctrl-group { display: flex; flex-direction: column; gap: 3px; position: relative; }
 .ctrl-label { font-family: var(--font-mono); font-size: 8.5px; font-weight: 600; letter-spacing: 0.14em; color: var(--text-3); }
 .ctrl-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
