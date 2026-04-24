@@ -17,6 +17,28 @@ const CAM_BASE = {
   3: 'https://srv-syd05.chatswoodchurch.org:8808',
 };
 
+// Shared brief-pulse helper for keyboard shortcuts and per-arrow wheel.
+// Fires `startQ` on the camera CGI and schedules `stopQ` PULSE_MS later;
+// back-to-back calls reset the pending stop timer for that (camera, stopQ)
+// pair so rapid key-repeats / wheel ticks chain smoothly.
+const _pulseTimers = {};
+function pulseCgi(camera, startQ, stopQ, ms) {
+  const base = CAM_BASE[camera];
+  if (!base) return;
+  fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&${startQ}`, { mode: 'no-cors' }).catch(() => {});
+  const key = `${camera}:${stopQ}`;
+  if (_pulseTimers[key]) clearTimeout(_pulseTimers[key]);
+  _pulseTimers[key] = setTimeout(() => {
+    fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&${stopQ}`, { mode: 'no-cors' }).catch(() => {});
+    _pulseTimers[key] = null;
+  }, ms || 180);
+  // Invalidate the preset CUE marker on manual pan/tilt — same contract as ptzCmd().
+  if (stopQ === 'ptzstop') {
+    window.dispatchEvent(new CustomEvent('ptz:manual-move', { detail: { camera } }));
+  }
+}
+window.pulseCgi = pulseCgi;
+
 function ptzCmd(camera, query) {
   const base = CAM_BASE[camera];
   if (!base) return;
