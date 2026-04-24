@@ -97,34 +97,80 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
 
   const openFeedContext = (e, c) => {
     if (c.isData) return;
-    // "Update" iterates all presets stored for this camera, recalls each in
-    // turn, waits for arrival, and broadcasts a refresh event the PresetGrid
-    // listens for so it can bump each thumb's cache-bust timestamp.
+    // "Update" iterates all presets stored for this camera, recalls each
+    // in turn, waits for arrival (settle), refreshes the thumb, then moves
+    // on. Each step:
+    //   1. Dispatch preset:updating → PresetGrid highlights the current
+    //      thumb with a CUE badge so operators can see progress in the
+    //      grid as the sweep enumerates.
+    //   2. Fire goto_abs (preferred, abs values) or poscall (legacy).
+    //   3. settle() on VISCA — no fixed wall clock.
+    //   4. Dispatch preset:refresh → PresetGrid snapshots the now-
+    //      stationary view and bumps the thumb's cache-buster.
+    //   5. Log progress `Update i/N · Cam C · Label` so the activity
+    //      panel reads like a rundown.
     const items = [
       {
         label: 'Update',
         icon: <Icon name="rotate" size={13}/>,
-        onClick: () => {
+        onClick: async () => {
           const presets = (window.LS_CONFIG?.presets || []);
           const startIndex = window.LS_CONFIG?.presetStartIndex || 100;
+          const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
           const matches = presets
             .map((p, slot) => ({ p, slot }))
             .filter(x => x.p && String(x.p.camera) === String(c.camera));
-          window.Log?.add('camera', `Update thumbs · Cam ${c.camera}`, `${matches.length} presets`);
-          matches.forEach((x, i) => {
-            setTimeout(() => {
-              // Recall the preset through the auth-aware PHP proxy, wait
-              // for the camera to arrive, then fire the refresh event
-              // (preset-grid's handler snapshots and bumps the thumb).
-              const presetId = startIndex + x.slot;
+          const N = matches.length;
+          window.Log?.add('camera', `Update thumbs · Cam ${c.camera}`, `${N} presets — sweeping now`);
+
+          for (let i = 0; i < N; i++) {
+            const { p, slot } = matches[i];
+            const presetId = startIndex + slot;
+            const label = p.label || `slot ${slot}`;
+
+            window.Log?.add('camera', `Update ${i + 1}/${N} · Cam ${c.camera}`, label);
+            // Tell PresetGrid which thumb is currently being updated so it
+            // can show the CUE badge as the cursor walks the grid.
+            window.dispatchEvent(new CustomEvent('preset:updating', {
+              detail: { camera: c.camera, slot }
+            }));
+
+            // Prefer abs position when we have it (firmware-resilient);
+            // fall back to legacy poscall for pre-migration presets.
+            const hasAbs = p.pan != null && p.tilt != null;
+            if (hasAbs) {
+              const params = new URLSearchParams({
+                cmd: 'goto_abs', camera: String(c.camera),
+                pan: String(p.pan), tilt: String(p.tilt),
+              });
+              if (p.zoom  != null) params.set('zoom',  String(p.zoom));
+              if (p.focus != null) params.set('focus', String(p.focus));
+              try { await fetch(`${endpoint}?${params}`); } catch (_) {}
+            } else {
               ptzCmd(c.camera, `poscall&${presetId}`);
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('preset:refresh', {
-                  detail: { camera: c.camera, slot: x.slot }
-                }));
-              }, 5000);
-            }, i * 6000);
-          });
+            }
+
+            // Wait for the camera to physically arrive, not a fixed timer.
+            await (window.PTZState?.settle(c.camera) || Promise.resolve(null));
+
+            // Refresh the thumb now that the view is stationary. The
+            // preset:refresh listener in PresetGrid handles the snapshot
+            // (WebRTC-first with server fallback) and cache-bust bump.
+            window.dispatchEvent(new CustomEvent('preset:refresh', {
+              detail: { camera: c.camera, slot }
+            }));
+
+            // Small breather so the refresh snapshot has time to write to
+            // disk before the next move starts potentially clobbering the
+            // live <video> buffer.
+            await new Promise(r => setTimeout(r, 400));
+          }
+
+          // Sweep finished — clear the "updating" cursor.
+          window.dispatchEvent(new CustomEvent('preset:updating', {
+            detail: { camera: c.camera, slot: null }
+          }));
+          window.Log?.add('camera', `Update complete · Cam ${c.camera}`, `${N} presets refreshed`);
         },
       },
     ];

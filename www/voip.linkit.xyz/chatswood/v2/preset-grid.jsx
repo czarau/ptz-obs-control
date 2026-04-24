@@ -659,11 +659,32 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
           .catch(() => {});
       });
     };
+    // Live-feed "Update" sweep fires this before each step so the grid can
+    // show a CUE badge on the thumb currently being processed. slot=null
+    // clears the cursor when the sweep finishes. Reuses the same
+    // activeByCam state the click-to-arm flow uses, so the visual is the
+    // same orange border + CUE badge operators already recognise.
+    const onPresetUpdating = (e) => {
+      const slot = e.detail?.slot;
+      const cam  = String(e.detail?.camera || '');
+      if (!cam) return;
+      if (slot == null) {
+        setActiveByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
+        return;
+      }
+      const bucket = SLOT_BUCKETS.find(b => b.slots.includes(slot))
+        || (QUEUE_SLOTS.includes(slot) ? { key: 'queue' } : null);
+      if (!bucket) return;
+      const thumbId = `${bucket.key}-${slot}`;
+      setActiveByCam(m => ({ ...m, [cam]: thumbId }));
+    };
     window.addEventListener('ptz:manual-move', onManualMove);
     window.addEventListener('preset:refresh', onPresetRefresh);
+    window.addEventListener('preset:updating', onPresetUpdating);
     return () => {
       window.removeEventListener('ptz:manual-move', onManualMove);
       window.removeEventListener('preset:refresh', onPresetRefresh);
+      window.removeEventListener('preset:updating', onPresetUpdating);
     };
   }, []);
 
