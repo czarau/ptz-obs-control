@@ -699,28 +699,17 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
   }, [liveCamera, activeByCam]);
 
   const onThumbContext = (e, id, preset, bucket) => {
-    const liveCam = Number(liveCamera) || 0;
     const isArmed = activeByCam[preset.camera] === id;
     const isQueue = bucket && bucket.key === 'queue';
     // Trigger a thumb refresh for this preset so the card picks up the new snapshot.
     const bumpThumb = () => setRefreshMap(m => ({ ...m, [id]: Date.now() }));
 
     const ICO = (name) => <Icon name={name} size={13}/>;
+    // Save-from-live and per-camera save buttons removed — the drag-drop
+    // flow (drag a live feed onto a thumb, or drag one thumb onto another
+    // to copy) fully replaces them. Home is kept because it assigns a
+    // semantic role to the preset slot that drag-drop can't express.
     const items = [
-      {
-        label: 'Save Live',
-        icon: ICO('crosshairs'),
-        disabled: !liveCam,
-        onClick: () => {
-          PRESET_ACTIONS.savePosition({ ...preset, camera: String(liveCam) }, liveCam);
-          setTimeout(bumpThumb, 1500);
-        },
-      },
-      { separator: true },
-      { label: 'Save Camera Back',  icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 1); setTimeout(bumpThumb, 1500); } },
-      { label: 'Save Camera Left',  icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 2); setTimeout(bumpThumb, 1500); } },
-      { label: 'Save Camera Right', icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 3); setTimeout(bumpThumb, 1500); } },
-      { separator: true },
       {
         label: 'Save as Home',
         icon: ICO('home'),
