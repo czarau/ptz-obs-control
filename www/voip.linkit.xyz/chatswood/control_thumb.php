@@ -1,5 +1,9 @@
 <?php
-  $cmp_url = 'http://10.241.57.96:8811';
+  // PTZOptics Camera Management Platform (CMP v1) — /cgi-bin/setAutoTracking/{0|1}.
+  // The old 10.241.57.96:8811 entry pointed at a no-longer-reachable portproxy;
+  // CMP is on the same 192.168.0.0/24 subnet as the cameras and is proxied by
+  // the nginx 8810 server block.
+  $cmp_url = 'http://192.168.0.139:8810';
 
   function GetCameraIP($cam)
   {
