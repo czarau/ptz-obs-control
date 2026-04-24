@@ -675,32 +675,36 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
   // on any queueRunning transition — a stale claim from a prior run
   // could cause false matches or spurious pauses.
   //
-  // Three resume cases:
+  // Four resume cases:
   //
   //   Fresh start (timer=0): take the current slot. queueLiveIdx
   //     defaults to 0 so this is slot 0 unless someone's moved it.
   //
-  //   Paused mid-slot, live focus INTACT (liveCamera still on the
-  //     current slot's camera): nothing to do — the tick interval
-  //     restarts on queueRunning change and carries the countdown.
+  //   Paused mid-slot, all intact (live cam AND queue's armed thumb
+  //     still on that cam): tick interval picks up, no take needed.
   //
-  //   Paused mid-slot, live focus LOST (operator took a different
-  //     scene while paused): resume by jumping to the first queue
-  //     slot whose thumb is armed (the "cued" queue thumb), or if
-  //     nothing's armed, restart from slot 0. Matches the operator's
-  //     mental model — resuming shouldn't silently keep counting on
-  //     a camera that hasn't been on air for minutes.
+  //   Paused mid-slot, live cam matches but queue's thumb was
+  //     REMOVED from the live cam (operator armed a non-queue
+  //     preset on it): advance to the next queue slot. Without this
+  //     the countdown keeps ticking invisibly — ThumbCard only
+  //     shows the queueTimer badge on the queue thumb that's
+  //     currently ON AIR, and the queue thumb is no longer on air.
+  //
+  //   Paused mid-slot, live cam doesn't match: jump to the first
+  //     queue slot whose thumb is still armed, or slot 0 if none.
   useEffectPG(() => {
     queueClaimCamIdRef.current = null;
     queuePreRollIdRef.current = null;
     queuePreRollCamRef.current = null;
     if (!queueRunning) return;
 
-    const curIdx = queueLiveIdxRef.current;
+    const curIdx  = queueLiveIdxRef.current;
     const curSlot = QUEUE_SLOTS[curIdx];
-    const curPre = presetFor(curSlot);
-    const expectedCam = Number(curPre.camera);
-    const focusIntact = Number(liveCamera) === expectedCam;
+    const curPre  = presetFor(curSlot);
+    const curId   = `queue-${curSlot}`;
+    const curCam  = String(curPre.camera);
+    const focusIntactCam = Number(liveCamera) === Number(curPre.camera);
+    const queueThumbStillArmed = activeByCam[curCam] === curId;
 
     if (queueTimerRef.current === 0) {
       // Fresh start — take from current index.
@@ -708,15 +712,26 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       return;
     }
 
-    if (focusIntact) {
-      // Mid-slot resume, program still on the expected camera — the
-      // tick interval picks up where it left off. No take needed.
+    if (focusIntactCam && queueThumbStillArmed) {
+      // Mid-slot resume, fully intact — tick interval carries the
+      // countdown. No take / camera move.
       window.Log?.add('live', 'Queue resumed', `${curPre.label} · ${queueTimerRef.current}s left`);
       return;
     }
 
-    // Lost focus. Find the first queue slot whose thumb is armed;
-    // fall back to slot 0 (the "1st thumb").
+    if (focusIntactCam && !queueThumbStillArmed) {
+      // Live scene is still on the queue's expected camera, but the
+      // queue's thumb there was re-armed — the countdown would keep
+      // running on a thumb that's no longer "on-air" to us, and the
+      // visual timer badge wouldn't show. Advance.
+      const nextIdx = (curIdx + 1) % QUEUE_SLOTS.length;
+      window.Log?.add('live', 'Queue resumed · live removed from queue', `advancing to slot ${nextIdx + 1}`);
+      takeQueueItem(nextIdx);
+      return;
+    }
+
+    // Lost focus camera-wise. Find the first queue slot whose thumb
+    // is armed; fall back to slot 0 (the "1st thumb").
     const armedIdx = QUEUE_SLOTS.findIndex(slot => {
       const p = presetFor(slot);
       const cam = String(p.camera);

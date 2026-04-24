@@ -7,7 +7,7 @@
   // running stale code indefinitely — e.g. a preset-grid missing the
   // goto_abs path keeps firing poscall on a firmware-wiped camera. Bump this
   // whenever you ship a change to any asset in this directory.
-  $ASSET_VER = '26';
+  $ASSET_VER = '27';
 
   $dataDir = __DIR__ . '/../.data';
   $user = (isset($_GET['id']) && $_GET['id'] === 'shccc') ? 'shccc' : 'chatswood';
