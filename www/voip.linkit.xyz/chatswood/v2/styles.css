@@ -331,6 +331,14 @@ em { font-style: normal; }
 .feed .feed-img { flex: 0 0 auto; }
 .feed .ptzpad { margin-top: auto; }
 .feed-onair { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 20px rgba(34,197,94,0.2); }
+/* Hide the Chrome/Edge hover picture-in-picture button that overlays the
+ * top-right of any playing <video>. disablePictureInPicture on the element
+ * itself handles Firefox + most Chromium; the pseudo-element covers Safari
+ * and older Chromium toolbars. */
+.feed video::-webkit-media-controls-picture-in-picture-button,
+.feed video::-internal-media-controls-overflow-button,
+.feed video::-webkit-media-controls-overlay-enclosure { display: none !important; }
+.feed video::-webkit-media-controls { display: none !important; }
 .feed-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surf-2); }
 .feed-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .feed-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text); }

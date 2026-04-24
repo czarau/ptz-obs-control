@@ -153,6 +153,9 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
           autoPlay
           muted
           playsInline
+          disablePictureInPicture
+          disableRemotePlayback
+          controlsList="nodownload nofullscreen noplaybackrate nopictureinpicture noremoteplayback"
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: '#000' }}
         />
         {cam.isData && (
