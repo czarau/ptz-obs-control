@@ -629,6 +629,19 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       queuePreRollCamRef.current = null;
     }
 
+    // Override the ping-pong cue (set by onTakeSceneLive → outgoing cam)
+    // with the queue's planned next camera. During a queue run the
+    // operator's mental model is "what's next in the rundown", not
+    // "what was live last". If there's no pre-roll (next slot is same
+    // cam), clear the cue entirely so no stale CUE badge lingers.
+    if (setCuedSceneFromNumber) {
+      if (nextCam && nextCam !== cam) {
+        setCuedSceneFromNumber(Number(nextPreset.camera));
+      } else {
+        setCuedSceneFromNumber(null);
+      }
+    }
+
     window.Log?.add('live', `Queue · take #${qIdx + 1}`, `${preset.label} · ${t}s`);
   };
 
