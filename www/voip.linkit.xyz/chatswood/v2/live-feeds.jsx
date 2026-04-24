@@ -467,11 +467,7 @@ function OverlayDock({ overlays, setOverlays, onTake }) {
 
       <div className="dock-sec">
         <div className="dock-head">Stream Health</div>
-        <HealthRow label="Bitrate"  value="—"     unit="kbps"/>
-        <HealthRow label="Dropped"  value="—"     unit="frames"/>
-        <HealthRow label="Latency"  value="—"     unit="s"/>
-        <HealthRow label="Viewers"  value="—"     unit="live"/>
-        <HealthRow label="CPU"      value="—"     unit="%"/>
+        <StreamHealth />
       </div>
 
       <div className="dock-sec dock-take">
@@ -523,6 +519,36 @@ function Meter({ label, level, active, muted, master }) {
       </div>
       <div className="meter-num">{mag > 0 ? `${magDb.toFixed(0)} dB` : '-∞ dB'}</div>
     </div>
+  );
+}
+
+function StreamHealth() {
+  // Ticks every second so rows re-read window.LS_HEALTH (populated by the
+  // App-level OBS poll). Cheap — this whole block is tiny.
+  const [, tick] = useStateLF(0);
+  useEffectLF(() => {
+    const id = setInterval(() => tick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const h = window.LS_HEALTH || {};
+  const fmt = (v, d = '—') => (v == null ? d : v);
+  // Congestion is 0..1 where lower = healthier; green < 0.3, red > 0.8.
+  const good = (k, v) => {
+    if (v == null) return false;
+    if (k === 'bitrate')  return v > 0;
+    if (k === 'dropped')  return v === 0;
+    if (k === 'cpu')      return v < 70;
+    return false;
+  };
+  return (
+    <>
+      <HealthRow label="Bitrate"  value={fmt(h.bitrateKbps)}  unit="kbps"   good={good('bitrate', h.bitrateKbps)} />
+      <HealthRow label="Dropped"  value={fmt(h.droppedFrames)} unit="frames" good={good('dropped', h.droppedFrames)} />
+      <HealthRow label="Congestion" value={h.congestion != null ? h.congestion.toFixed(2) : '—'} unit="q" good={h.congestion != null && h.congestion < 0.3} />
+      <HealthRow label="Frames"   value={fmt(h.totalFrames)}  unit="total" />
+      <HealthRow label="CPU"      value={fmt(h.cpu)}          unit="%"      good={good('cpu', h.cpu)} />
+    </>
   );
 }
 

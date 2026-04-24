@@ -57,22 +57,80 @@ function App() {
     // split is wired up.
   };
 
-  // Poll OBS record/stream status so UI reflects actual state.
+  // Poll OBS record/stream status + stats. We derive start-at-timestamps
+  // (now - outputDuration) so any locally-computed "HH:MM:SS" timer can
+  // just read Date.now() on every tick — drift-free between polls.
+  const [recordStartedAt, setRecordStartedAt] = useState(null);
+  const [streamStartedAt, setStreamStartedAt] = useState(null);
+  const [streamHealth, setStreamHealth] = useState(null);
+  const streamBytesRef = React.useRef({ bytes: 0, ts: 0, kbps: 0 });
+
   useEffect(() => {
     if (!window.OBS) return;
     let alive = true;
     const sync = () => {
-      Promise.all([window.OBS.recordStatus(), window.OBS.streamStatus()])
-        .then(([rec, str]) => {
+      Promise.all([window.OBS.recordStats(), window.OBS.streamStats(), window.OBS.stats()])
+        .then(([rec, str, s]) => {
           if (!alive) return;
-          setRail(s => ({ ...s, recording: !!rec, streaming: !!str }));
+          setRail(st => ({ ...st, recording: !!rec.outputActive, streaming: !!str.outputActive }));
+          setRecordStartedAt(rec.outputActive ? Date.now() - (rec.outputDuration || 0) : null);
+          setStreamStartedAt(str.outputActive ? Date.now() - (str.outputDuration || 0) : null);
+
+          // Bitrate: delta bytes / delta seconds × 8 → bits/s → /1000 kbps.
+          const now = Date.now();
+          const prev = streamBytesRef.current;
+          let kbps = prev.kbps;
+          if (str.outputActive && prev.ts && str.outputBytes != null && str.outputBytes >= prev.bytes) {
+            const dBytes = str.outputBytes - prev.bytes;
+            const dSecs  = (now - prev.ts) / 1000;
+            if (dSecs > 0) kbps = Math.round((dBytes * 8 / 1000) / dSecs);
+          }
+          streamBytesRef.current = {
+            bytes: str.outputBytes || 0,
+            ts: now,
+            kbps: str.outputActive ? kbps : 0,
+          };
+
+          setStreamHealth({
+            active:       !!str.outputActive,
+            bitrateKbps:  str.outputActive ? kbps : null,
+            droppedFrames: str.outputSkippedFrames != null ? str.outputSkippedFrames : null,
+            totalFrames:  str.outputTotalFrames,
+            congestion:   str.outputCongestion,          // 0..1 quality indicator
+            cpu:          s && s.cpuUsage != null ? Math.round(s.cpuUsage) : null,
+          });
         })
         .catch(() => {});
     };
     sync();
-    const id = setInterval(sync, 5000);
+    const id = setInterval(sync, 2500);
     return () => { alive = false; clearInterval(id); };
   }, []);
+
+  // 1 Hz ticker for live duration readouts in Record/Stream buttons.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    if (!recordStartedAt && !streamStartedAt) return;
+    const id = setInterval(() => setNowTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [recordStartedAt, streamStartedAt]);
+
+  // Expose stream health on window so OverlayDock can read it without
+  // prop-drilling through LiveFeedRow.
+  useEffect(() => { window.LS_HEALTH = streamHealth; }, [streamHealth]);
+
+  const fmtDuration = (startedAt) => {
+    if (!startedAt) return null;
+    const secs = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${m}:${String(s).padStart(2,'0')}`;
+  };
+  const recordSub = fmtDuration(recordStartedAt);
+  const streamSub = fmtDuration(streamStartedAt);
 
   // Poll OBS current program scene so external scene changes (someone switching
   // in OBS directly, or an auto-queue advance) are reflected in the UI.
@@ -153,7 +211,7 @@ function App() {
 
   return (
     <div className="app">
-      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} emergencyLive={liveCamId === 'emergency'} />
+      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} emergencyLive={liveCamId === 'emergency'} recordSub={recordSub} streamSub={streamSub} />
       <TopBar
         cueIdx={cueIdx}
         setCueIdx={setCueIdx}

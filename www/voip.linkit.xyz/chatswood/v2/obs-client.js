@@ -56,12 +56,29 @@ const OBS = (() => {
       return call('GetRecordStatus').then(d => d.outputActive);
     },
 
+    // Full record status — outputActive, outputPaused, outputTimecode,
+    // outputDuration (ms), outputBytes.
+    recordStats() {
+      return call('GetRecordStatus');
+    },
+
     toggleStream() {
       return call('ToggleStream');
     },
 
     streamStatus() {
       return call('GetStreamStatus').then(d => d.outputActive);
+    },
+
+    // Full stream status payload — includes outputBytes (for bitrate calc),
+    // outputDuration, outputSkippedFrames/outputTotalFrames, outputCongestion.
+    streamStats() {
+      return call('GetStreamStatus');
+    },
+
+    // Runtime stats — cpuUsage (%), memoryUsage (MB), activeFps, etc.
+    stats() {
+      return call('GetStats');
     },
 
     // Mirrors SelectAudioSource in control_v2.js: for every scene, toggle
