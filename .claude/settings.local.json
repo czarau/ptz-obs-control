@@ -28,7 +28,8 @@
       "Bash(py -c \"import ast; ast.parse\\(open\\('D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/python/cam_control.py'\\).read\\(\\)\\); print\\('Python OK'\\)\")",
       "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=2\")",
       "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=3\")",
-      "Bash(curl -sk --max-time 20 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=focus_auto&camera=1\")"
+      "Bash(curl -sk --max-time 20 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=focus_auto&camera=1\")",
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/v2/styles.css?v=99\")"
     ]
   }
 }
