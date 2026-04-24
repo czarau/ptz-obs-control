@@ -212,6 +212,7 @@ def _jsonable(r):
 
 response = ''
 steps = []  # per-axis responses for goto_abs so we can see which step failed
+focus_prior_mode = None  # 'auto' | 'manual' | 'unknown' — top-level of _out, not a step
 
 if args.cmd == 'goto':
     #print("Sending To Preset 100...")
@@ -251,8 +252,13 @@ if args.cmd == 'goto_abs':
         # mode, force MF long enough to land the exact captured focus
         # value, then restore the original mode so AF-preferring operators
         # keep AF and MF-preferring ones keep MF. No silent mode-swap.
-        prior_mode = cam.get_focus_mode()  # 'auto' | 'manual' | 'unknown'
-        steps.append({"axis": "focus_prior_mode", "response": prior_mode})
+        #
+        # The prior mode is a QUERY result (auto|manual|unknown), not a
+        # command response — emit it at the top level of _out so the
+        # "all steps should be COMPLETE" check doesn't flag it as a
+        # failure.
+        prior_mode = cam.get_focus_mode()
+        focus_prior_mode = prior_mode
         r_mf = cam.set_focus_manual()
         steps.append({"axis": "focus_mode_mf", "response": _jsonable(r_mf)})
         r = cam.set_focus_position(args.focus)
@@ -285,5 +291,7 @@ if safe_response is not None:
     _out["response"] = safe_response
 if steps:
     _out["steps"] = steps
+if focus_prior_mode is not None:
+    _out["focus_prior_mode"] = focus_prior_mode
 
 print(_json.dumps(_out))
