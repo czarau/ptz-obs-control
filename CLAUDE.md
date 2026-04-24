@@ -12,17 +12,16 @@ Hosted at `voip.linkit.xyz/chatswood/`. Supports two site configurations selecte
 ## Architecture
 
 ### Entry Point & Server-Side Rendering
-`control.php` is the main page — it's a PHP file that outputs HTML. It:
+`index.php` is the main page — it's a PHP file that outputs HTML. It:
 - Selects site config (OBS WebSocket address, settings file) based on `?id=` param
 - Reads preset settings from `.data/settings.json` (or `settings-shccc.json`)
 - Renders camera preset grid with PHP helper functions (`GetPresetCamera`, `GetPresetLabel`, `GetPresetTimeout`)
 - Injects `WebOBS_IP_Addr` and `WebOBS_Password` as JS constants
 
 ### Two JS Generations
-- `control.js` — older version, uses `CameraIp()` returning `ip:port` strings with `http://` prefix in callers
 - `control_v2.js` — current version, uses `CameraURL()` returning full URLs like `https://srv-syd05.chatswoodchurch.org:8806`. Also adds auto-queue and server-side preset persistence via `control_thumb.php`
 
-The page loads `control_v2.js` (set in the `<script>` tag in `control.php`).
+The page loads `control_v2.js` (set in the `<script>` tag in `index.php`).
 
 ### Key Subsystems
 
@@ -48,7 +47,7 @@ The page loads `control_v2.js` (set in the `<script>` tag in `control.php`).
 - Serves cached thumbnails (`thumb_cache`) or live captures (`thumb`)
 - Also handles preset get/set, face tracking, and direct PTZ commands via Python
 
-**Smart Device Control** — Toggles church lights (SPOTS, STAGE, FRONT) and LG TV panels via Home Assistant webhooks through `control.php?action=smartdevice`
+**Smart Device Control** — Toggles church lights (SPOTS, STAGE, FRONT) and LG TV panels via Home Assistant webhooks through `index.php?action=smartdevice`
 
 **WebRTC Preview** (`webrtc.js`) — Connects to RTSPtoWeb server for live camera preview in `<video>` elements. Auto-reconnects on data channel close.
 
