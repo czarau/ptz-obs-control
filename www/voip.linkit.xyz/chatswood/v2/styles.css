@@ -224,8 +224,13 @@ em { font-style: normal; }
 .preset-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
-  grid-template-rows: auto repeat(4, auto);
-  align-content: start;
+  /* Rows stretch to share any extra vertical space, but can also shrink via
+   * minmax(0, ...) so that when the grid is taller than the thumbs' natural
+   * 16:9 size the image area simply grows instead of leaving dead space
+   * below the last row. Combined with flex-grow on .thumb-img and the fixed
+   * 28px .thumb-meta, the meta stays a consistent visual weight at every
+   * grid height and cards never clip their label row. */
+  grid-template-rows: auto repeat(4, minmax(0, 1fr));
   gap: 12px 12px;
   min-height: 0;
   min-width: 0;
@@ -291,7 +296,7 @@ em { font-style: normal; }
   0%   { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 10px rgba(245,158,11,0.35); }
   100% { border-color: var(--border); box-shadow: none; }
 }
-.thumb-img { position: relative; background: #000; overflow: hidden; flex: 0 0 auto; width: 100%; aspect-ratio: 16 / 9; }
+.thumb-img { position: relative; background: #000; overflow: hidden; flex: 1 1 auto; min-height: 0; width: 100%; aspect-ratio: 16 / 9; }
 .thumb-img svg { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
 .thumb-livebadge { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--live); color: #04130a; padding: 1px 5px; border-radius: 3px; }
 .thumb-cuebadge  { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--warn); color: #1a1205; padding: 1px 5px; border-radius: 3px; }
