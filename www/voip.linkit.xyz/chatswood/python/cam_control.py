@@ -145,6 +145,31 @@ class CameraPTZOptics:
         else:
             data = cam._send_command(f'04 3F 02 {preset_num:x}')
 
+    @staticmethod
+    def _int_to_nibbles(value, nibbles=4):
+        """Split a signed int into VISCA zero-padded nibble bytes. Each hex
+        digit becomes its own byte with high nibble 0 — e.g. 0x1F 0x3A →
+        '01 0F 03 0A'. Negative values encoded as two's complement over the
+        specified nibble width."""
+        if value < 0:
+            value = value + (1 << (nibbles * 4))
+        hex_str = f'{value & ((1 << nibbles*4) - 1):0{nibbles}x}'
+        return ' '.join(f'0{c}' for c in hex_str)
+
+    def set_pantilt_position(self, pan, tilt, pan_speed=0x14, tilt_speed=0x14):
+        # VISCA: 81 01 06 02 VV WW 0p 0p 0p 0p 0t 0t 0t 0t FF
+        pan_nib  = self._int_to_nibbles(int(pan),  4)
+        tilt_nib = self._int_to_nibbles(int(tilt), 4)
+        return cam._send_command(f'06 02 {pan_speed:02x} {tilt_speed:02x} {pan_nib} {tilt_nib}')
+
+    def set_zoom_position(self, zoom):
+        # VISCA: 81 01 04 47 0z 0z 0z 0z FF
+        return cam._send_command(f'04 47 {self._int_to_nibbles(int(zoom), 4)}')
+
+    def set_focus_position(self, focus):
+        # VISCA: 81 01 04 48 0f 0f 0f 0f FF  (camera must be in manual focus)
+        return cam._send_command(f'04 48 {self._int_to_nibbles(int(focus), 4)}')
+
     def set_focus_auto(self):
         # VISCA: 81 01 04 38 02 FF  — continuous autofocus
         return cam._send_command('04 38 02')
@@ -165,6 +190,10 @@ parser.add_argument("-i", "--ip", required=True)
 parser.add_argument("-c", "--cmd", required=False)
 parser.add_argument("-p", "--val", required=False)
 parser.add_argument("-P", "--port", required=False, type=int, default=5678)
+parser.add_argument("--pan",   type=int, required=False)
+parser.add_argument("--tilt",  type=int, required=False)
+parser.add_argument("--zoom",  type=int, required=False)
+parser.add_argument("--focus", type=int, required=False)
 args = parser.parse_args()
 
 cam = CameraPTZOptics(args.ip, args.port)
@@ -187,6 +216,17 @@ if args.cmd == 'focus_manual':
 
 if args.cmd == 'focus_onepush':
     response = cam.focus_onepush()
+
+if args.cmd == 'goto_abs':
+    # Send the camera to an absolute pan/tilt/zoom/focus read from JSON
+    # rather than an onboard preset slot. Immune to firmware preset wipes.
+    # Any omitted axis is left untouched.
+    if args.pan is not None and args.tilt is not None:
+        response = cam.set_pantilt_position(args.pan, args.tilt)
+    if args.zoom is not None:
+        response = cam.set_zoom_position(args.zoom)
+    if args.focus is not None:
+        response = cam.set_focus_position(args.focus)
 
 #print("Getting PTZ Position...")
 pan, tilt = cam.get_pantilt_position();

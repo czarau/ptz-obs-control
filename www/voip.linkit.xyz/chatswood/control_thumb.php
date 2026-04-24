@@ -145,12 +145,21 @@
     }
     
     $preset['camera'] = $_GET['camera'];
-    
+
     if (isset($_GET['label']))
       $preset['label'] = $_GET['label'];
-    
+
     if (isset($_GET['timeout']))
       $preset['timeout'] = $_GET['timeout'];
+
+    // Absolute VISCA pan/tilt/zoom/focus values — the preset's position is
+    // stored in JSON rather than the camera's onboard preset slot, so firmware
+    // wipes / factory resets / cross-camera mirroring don't lose the data.
+    foreach (['pan', 'tilt', 'zoom', 'focus'] as $k) {
+      if (isset($_GET[$k]) && is_numeric($_GET[$k])) {
+        $preset[$k] = (int)$_GET[$k];
+      }
+    }
     
     if (isset($_GET['admin']) and $_GET['admin'] == 1) 
     {
@@ -332,6 +341,37 @@
       escapeshellarg($_GET['cmd'])
     ));
     echo $json;
+  }
+  elseif ($_GET['cmd'] == 'goto_abs')
+  {
+    // Drive the camera to an absolute pan/tilt/zoom/focus position read
+    // from the preset JSON (not an onboard preset slot). Immune to firmware
+    // preset wipes.
+    //   ?cmd=goto_abs&camera=1&pan=-107&tilt=36&zoom=7791&focus=974
+    $cam = $_GET['camera'];
+    if (!is_numeric($cam)) die;
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) die;
+
+    $args = '--cmd=goto_abs';
+    foreach (['pan', 'tilt', 'zoom', 'focus'] as $k) {
+      if (isset($_GET[$k]) && preg_match('/^-?\d+$/', $_GET[$k])) {
+        $args .= " --{$k}=" . escapeshellarg($_GET[$k]);
+      }
+    }
+
+    header('Content-Type: application/json');
+    $raw = shell_exec(sprintf(
+      "python3.9 %s --ip=%s --port=%s %s 2>&1",
+      escapeshellarg(__dir__."/python/cam_control.py"),
+      escapeshellarg($visca[0]),
+      escapeshellarg((string)$visca[1]),
+      $args
+    ));
+    $trimmed = trim($raw ?? '');
+    $probe = json_decode($trimmed, true);
+    if ($probe !== null) echo $trimmed;
+    else echo json_encode(['error' => 'cam_control.py failed', 'stderr' => $trimmed]);
   }
   elseif ($_GET['cmd'] == 'preset_speed')
   {

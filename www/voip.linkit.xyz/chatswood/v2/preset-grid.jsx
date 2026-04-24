@@ -42,21 +42,52 @@ const MOTION_MS = 5000; // border flashes for this long after goto; thumb refres
 
 function presetFor(slot) {
   const raw = (window.LS_CONFIG?.presets || [])[slot];
+  const num = (v) => (v == null || v === '' ? null : Number(v));
   return {
     slot,
-    camera: raw?.camera || '1',
-    label:  raw?.label  || 'Preset',
+    camera:  raw?.camera  || '1',
+    label:   raw?.label   || 'Preset',
     timeout: raw?.timeout || 10,
     presetId: (window.LS_CONFIG?.presetStartIndex || 100) + slot,
+    // Absolute position — when present, moveCamera drives via goto_abs
+    // (VISCA) instead of the onboard preset slot. These become the
+    // primary source of truth once the preset has been (re-)saved.
+    pan:   num(raw?.pan),
+    tilt:  num(raw?.tilt),
+    zoom:  num(raw?.zoom),
+    focus: num(raw?.focus),
   };
 }
 
+function hasAbsPosition(preset) {
+  return preset && preset.pan != null && preset.tilt != null;
+}
+
 function moveCamera(preset) {
-  // Routes through the PHP proxy (for digest-auth on firmware 6.3.45+).
   const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-  const q = encodeURIComponent(`ptzcmd&poscall&${preset.presetId}`);
-  fetch(`${endpoint}?cmd=cgi&camera=${preset.camera}&q=${q}`).catch(() => {});
-  window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`, `preset ${preset.presetId}`);
+
+  if (hasAbsPosition(preset)) {
+    // New path — absolute VISCA position from JSON. Firmware-resilient.
+    const params = new URLSearchParams({
+      cmd: 'goto_abs',
+      camera: String(preset.camera),
+      pan:   String(preset.pan),
+      tilt:  String(preset.tilt),
+    });
+    if (preset.zoom  != null) params.set('zoom',  String(preset.zoom));
+    if (preset.focus != null) params.set('focus', String(preset.focus));
+    fetch(`${endpoint}?${params}`).catch(() => {});
+    window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`,
+      `abs p=${preset.pan} t=${preset.tilt} z=${preset.zoom ?? '-'} f=${preset.focus ?? '-'}`);
+  } else {
+    // Legacy fallback — camera-side preset slot. Only hit if a preset
+    // hasn't been re-saved since the migration to abs positions (or on
+    // new sites that still use onboard slots).
+    const q = encodeURIComponent(`ptzcmd&poscall&${preset.presetId}`);
+    fetch(`${endpoint}?cmd=cgi&camera=${preset.camera}&q=${q}`).catch(() => {});
+    window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`,
+      `slot ${preset.presetId} (legacy)`);
+  }
 }
 
 function takeLive(preset) {
@@ -71,18 +102,17 @@ const PRESET_ACTIONS = {
   endpoint: () => (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php',
   user:     () => (window.LS_CONFIG || {}).user || 'chatswood',
 
-  // Record camera `cam`'s current position into this preset slot. When
-  // `admin` is true, write to the admin default bank instead of the user bank.
-  savePosition(preset, cam, opts = {}) {
+  // Capture camera `cam`'s current pan/tilt/zoom/focus via VISCA and save
+  // those absolute values into settings.json (not the camera's onboard
+  // preset slot). Immune to firmware preset wipes. When `admin` is true
+  // the write goes to the admin default bank instead of the user bank.
+  async savePosition(preset, cam, opts = {}) {
     const admin = !!opts.admin;
-    const startIndex = admin
-      ? (window.LS_CONFIG?.presetAdminIndex ?? 150)
-      : (window.LS_CONFIG?.presetStartIndex ?? 100);
-    const presetId = startIndex + preset.slot;
-
-    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-    const q = encodeURIComponent(`ptzcmd&posset&${presetId}`);
-    fetch(`${endpoint}?cmd=cgi&camera=${cam}&q=${q}`).catch(() => {});
+    const pos = await (window.PTZState?.query(cam) || Promise.resolve(null));
+    if (!pos) {
+      window.Log?.add('error', `Save · could not read Cam ${cam} position`);
+      return;
+    }
 
     const params = new URLSearchParams({
       cmd: 'set_preset',
@@ -90,15 +120,37 @@ const PRESET_ACTIONS = {
       id: String(preset.slot),
       camera: String(cam),
       label: preset.label || 'Preset',
+      pan:   String(pos.pan),
+      tilt:  String(pos.tilt),
+      zoom:  String(pos.zoom),
+      focus: String(pos.focus),
       ts: String(Date.now()),
     });
     if (admin) params.set('admin', '1');
-    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    try {
+      await fetch(`${PRESET_ACTIONS.endpoint()}?${params}`);
+    } catch (_) { /* ignore */ }
+
+    // Update the in-memory LS_CONFIG so the thumb click handler picks up the
+    // new abs values without a page reload.
+    if (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.presets)) {
+      const slot = preset.slot;
+      const existing = window.LS_CONFIG.presets[slot] || {};
+      window.LS_CONFIG.presets[slot] = {
+        ...existing,
+        camera: String(cam),
+        label: preset.label || existing.label || 'Preset',
+        pan:   pos.pan,
+        tilt:  pos.tilt,
+        zoom:  pos.zoom,
+        focus: pos.focus,
+      };
+    }
 
     window.Log?.add(
       admin ? 'system' : 'camera',
       `${admin ? 'Save default' : 'Save position'} · Cam ${cam} → ${preset.label}`,
-      `preset ${presetId}`
+      `p=${pos.pan} t=${pos.tilt} z=${pos.zoom} f=${pos.focus}`
     );
   },
 
@@ -163,9 +215,11 @@ const PRESET_ACTIONS = {
     } catch (_) { return null; }
   },
 
-  // Restore the preset back to the admin default: recall the admin preset
-  // position on its camera, then re-record that as the user preset so the
-  // next user recall goes to the default. Also copy metadata (camera/label).
+  // Restore the user preset from its admin default. Copies abs pan/tilt/
+  // zoom/focus (and camera/label) from the admin bank into the user bank,
+  // then drives the camera to that position so the operator can verify.
+  // Gracefully handles legacy admin presets that only have camera+label
+  // (no position data) by logging a note and skipping the physical move.
   async restoreDefault(preset) {
     const def = await PRESET_ACTIONS.getAdminPreset(preset);
     if (!def || !def.camera) {
@@ -173,13 +227,9 @@ const PRESET_ACTIONS = {
       return;
     }
     const cam = def.camera;
-    const adminId = (window.LS_CONFIG?.presetAdminIndex ?? 150) + preset.slot;
-    const userId  = (window.LS_CONFIG?.presetStartIndex ?? 100) + preset.slot;
     const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-    fetch(`${endpoint}?cmd=cgi&camera=${cam}&q=${encodeURIComponent(`ptzcmd&poscall&${adminId}`)}`).catch(() => {});
-    // Wait for the camera to arrive before snapshotting back to the user slot.
-    await new Promise(r => setTimeout(r, 5000));
-    fetch(`${endpoint}?cmd=cgi&camera=${cam}&q=${encodeURIComponent(`ptzcmd&posset&${userId}`)}`).catch(() => {});
+
+    // 1. Copy admin metadata (including abs position) into the user slot.
     const params = new URLSearchParams({
       cmd: 'set_preset',
       user: PRESET_ACTIONS.user(),
@@ -188,12 +238,64 @@ const PRESET_ACTIONS = {
       label: def.label || preset.label || 'Preset',
       ts: String(Date.now()),
     });
-    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    ['pan', 'tilt', 'zoom', 'focus'].forEach(k => {
+      if (def[k] != null) params.set(k, String(def[k]));
+    });
+    try { await fetch(`${PRESET_ACTIONS.endpoint()}?${params}`); } catch (_) {}
+
+    // Keep in-memory config in sync so the next click hits abs path.
+    if (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.presets)) {
+      window.LS_CONFIG.presets[preset.slot] = {
+        ...(window.LS_CONFIG.presets[preset.slot] || {}),
+        camera: String(cam),
+        label: def.label || preset.label || 'Preset',
+        ...(def.pan   != null ? { pan:   def.pan   } : {}),
+        ...(def.tilt  != null ? { tilt:  def.tilt  } : {}),
+        ...(def.zoom  != null ? { zoom:  def.zoom  } : {}),
+        ...(def.focus != null ? { focus: def.focus } : {}),
+      };
+    }
+
+    // 2. If the default has abs position data, drive the camera there so
+    //    the operator sees the restored view immediately.
+    if (def.pan != null && def.tilt != null) {
+      const gotoParams = new URLSearchParams({
+        cmd: 'goto_abs',
+        camera: String(cam),
+        pan:   String(def.pan),
+        tilt:  String(def.tilt),
+      });
+      if (def.zoom  != null) gotoParams.set('zoom',  String(def.zoom));
+      if (def.focus != null) gotoParams.set('focus', String(def.focus));
+      fetch(`${endpoint}?${gotoParams}`).catch(() => {});
+    } else {
+      window.Log?.add('system', `Restore default · no abs position — metadata only`);
+    }
+
     window.Log?.add('system', `Restore default · Cam ${cam} · ${def.label || preset.label}`);
   },
 };
 
-function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onClick, onContextMenu, queueBadge }) {
+function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onClick, onContextMenu, onDropCamera, queueBadge }) {
+  const [dragOver, setDragOver] = useStatePG(false);
+
+  // Accept drops that carry a camera number (set by LiveFeed's onDragStart).
+  const acceptsDrop = (e) => e.dataTransfer.types.includes('application/x-ls-camera');
+  const onDragOver = (e) => {
+    if (!acceptsDrop(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dragOver) setDragOver(true);
+  };
+  const onDragLeave = () => setDragOver(false);
+  const onDrop = (e) => {
+    if (!acceptsDrop(e)) return;
+    e.preventDefault();
+    setDragOver(false);
+    const cam = parseInt(e.dataTransfer.getData('application/x-ls-camera'), 10);
+    if (cam >= 1 && cam <= 3 && onDropCamera) onDropCamera(cam);
+  };
+
   return (
     <button
       className={
@@ -201,10 +303,14 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
         + (onAir ? " onair" : "")
         + (selected ? " selected" : "")
         + (inMotion ? " in-motion" : "")
+        + (dragOver ? " drag-over" : "")
         + (compact ? " compact" : "")
       }
       onClick={onClick}
       onContextMenu={onContextMenu}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
       <div className="thumb-img">
         <Thumb presetId={preset.presetId} camera={preset.camera} fresh={!!refreshTs} ts={refreshTs} />
@@ -220,7 +326,7 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
   );
 }
 
-function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext }) {
+function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop }) {
   const presets = bucket.slots.map(presetFor);
   return (
     <div className="pcol" style={{ gridColumn: `span ${bucket.span}` }}>
@@ -242,6 +348,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
               refreshTs={refreshMap[id]}
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, bucket)}
+              onDropCamera={(cam) => onThumbDrop(id, p, cam)}
             />
           );
         })}
@@ -252,7 +359,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
 
 const QUEUE_BUCKET = { key: 'queue', title: 'Queue', slots: QUEUE_SLOTS, cols: 2, span: 2 };
 
-function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, queueLiveIdx, queueTimer }) {
+function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, queueLiveIdx, queueTimer }) {
   return (
     <div className="pcol pcol-queue" style={{ gridColumn: "span 2" }}>
       <div className="pcol-head pcol-head-queue">
@@ -288,6 +395,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
               queueBadge={badge}
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, QUEUE_BUCKET)}
+              onDropCamera={(cam) => onThumbDrop(id, p, cam)}
             />
           );
         })}
@@ -529,6 +637,18 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     menu.open(e, items);
   };
 
+  // Drop target handler — a live-feed video was dragged onto this preset
+  // thumb. Save the dropped camera's current PTZ+focus into this preset
+  // (same action as right-click → Save Camera Back/Left/Right, but via
+  // direct-manipulation).
+  const onThumbDrop = (id, preset, cam) => {
+    const next = { ...preset, label: preset.label || 'Preset' };
+    PRESET_ACTIONS.savePosition(next, cam).then(() => {
+      setRefreshMap(m => ({ ...m, [id]: Date.now() + 1 }));
+    });
+    window.Log?.add('camera', `Drop · Cam ${cam} → ${preset.label || 'slot ' + preset.slot}`);
+  };
+
   const onThumbClick = async (id, preset) => {
     const cam = String(preset.camera);
 
@@ -613,6 +733,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
           refreshMap={refreshMap}
           onThumbClick={onThumbClick}
           onThumbContext={onThumbContext}
+          onThumbDrop={onThumbDrop}
         />
       ))}
       <AutoQueueColumn
@@ -625,6 +746,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         refreshMap={refreshMap}
         onThumbClick={onThumbClick}
         onThumbContext={onThumbContext}
+        onThumbDrop={onThumbDrop}
         queueLiveIdx={queueLiveIdx}
         queueTimer={queueTimer}
       />

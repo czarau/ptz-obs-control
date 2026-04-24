@@ -281,6 +281,7 @@ em { font-style: normal; }
 }
 
 .thumb {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--surf);
@@ -297,6 +298,18 @@ em { font-style: normal; }
 .thumb.selected { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 12px rgba(245,158,11,0.2); }
 .thumb.onair { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 16px rgba(34,197,94,0.25); }
 .thumb.in-motion { animation: thumb-motion 0.55s ease-in-out infinite alternate; }
+/* Drop hover — a live feed is being dragged over this thumb; release to save */
+.thumb.drag-over { border-color: #60a5fa; box-shadow: 0 0 0 2px #60a5fa, 0 0 18px rgba(96,165,250,0.5); }
+.thumb.drag-over::before {
+  content: "DROP TO SAVE"; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); z-index: 5;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; color: #fff; background: rgba(0,0,0,0.7);
+  padding: 4px 10px; border-radius: 4px; pointer-events: none;
+}
+/* Live feeds are draggable — show grab cursor on the feed card */
+.feed[draggable="true"] { cursor: grab; }
+.feed[draggable="true"]:active { cursor: grabbing; }
 @keyframes thumb-motion {
   0%   { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 10px rgba(245,158,11,0.35); }
   100% { border-color: var(--border); box-shadow: none; }

@@ -180,8 +180,21 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
   }, [cam.camera]);
 
 
+  const onDragStart = cam.camera > 0 ? (e) => {
+    // Carry the camera number so preset thumbs can drop-save its current
+    // PTZ values. Use a custom mime so random drops elsewhere ignore it.
+    e.dataTransfer.setData('application/x-ls-camera', String(cam.camera));
+    e.dataTransfer.setData('text/plain', `Camera ${cam.camera}`);
+    e.dataTransfer.effectAllowed = 'copy';
+  } : undefined;
+
   return (
-    <div className={"feed" + (onAir ? " feed-onair" : "")} onContextMenu={onContextMenu}>
+    <div
+      className={"feed" + (onAir ? " feed-onair" : "")}
+      onContextMenu={onContextMenu}
+      draggable={cam.camera > 0}
+      onDragStart={onDragStart}
+    >
       <div className="feed-head">
         <span className="feed-head-left">
           {cam.camera > 0 && (
@@ -299,8 +312,25 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
             // the camera's factory home.
             const home = (window.LS_CONFIG?.home || {})[String(camera)];
             if (home != null) {
-              const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(home);
-              ptzCmd(camera, `poscall&${presetId}`);
+              // Prefer the abs position saved with the preset — survives
+              // firmware wipes. Fall back to the camera's onboard slot
+              // recall if the preset hasn't been re-saved yet.
+              const raw = (window.LS_CONFIG?.presets || [])[Number(home)];
+              const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+              if (raw && raw.pan != null && raw.tilt != null) {
+                const params = new URLSearchParams({
+                  cmd: 'goto_abs',
+                  camera: String(camera),
+                  pan:   String(raw.pan),
+                  tilt:  String(raw.tilt),
+                });
+                if (raw.zoom  != null) params.set('zoom',  String(raw.zoom));
+                if (raw.focus != null) params.set('focus', String(raw.focus));
+                fetch(`${endpoint}?${params}`).catch(() => {});
+              } else {
+                const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(home);
+                ptzCmd(camera, `poscall&${presetId}`);
+              }
               window.Log?.add('camera', `Home · Cam ${camera}`, `slot ${home}`);
             } else {
               ptzCmd(camera, 'home');
