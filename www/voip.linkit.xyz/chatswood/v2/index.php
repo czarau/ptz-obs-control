@@ -42,11 +42,18 @@
       presetAdminIndex: <?= (int)($settings['preset_admin_index'] ?? 150) ?>,
       presets:          <?= json_encode($settings['presets'] ?? []) ?>,
       thumbEndpoint:    "../control_thumb.php",
-      smartEndpoint:    "../index.php"
+      smartEndpoint:    "../index.php",
+      webrtcStreams: {
+        back:  "https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=camera1",
+        left:  "https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=camera2",
+        right: "https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=camera3",
+        data:  "https://srv-syd05.chatswoodchurch.org/go2rtc/api/webrtc?src=usb_hdmi_720p"
+      }
     };
   </script>
 
   <script src="../js/obs-websocket.js"></script>
+  <script src="webrtc-client.js"></script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>

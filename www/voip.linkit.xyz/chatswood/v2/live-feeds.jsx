@@ -45,16 +45,18 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
   );
 }
 
-const { useState: useStateLF, useEffect: useEffectLF } = React;
+const { useEffect: useEffectLF, useRef: useRefLF } = React;
 
 function LiveFeed({ cam, onAir, onClick, ptzSpeed }) {
-  const [ts, setTs] = useStateLF(() => Date.now());
-  // Refresh live-feed thumbs every 3s
+  const videoRef = useRefLF(null);
+
+  // Spin up a WebRTC peer connection when the element mounts, tear it down on unmount.
   useEffectLF(() => {
-    if (cam.isData) return;
-    const id = setInterval(() => setTs(Date.now()), 3000);
-    return () => clearInterval(id);
-  }, [cam.isData]);
+    const url = (window.LS_CONFIG?.webrtcStreams || {})[cam.id];
+    if (!url || !videoRef.current || !window.startWebRTCPlay) return;
+    const pc = window.startWebRTCPlay(videoRef.current, url);
+    return () => { try { pc && pc.close(); } catch (_) {} };
+  }, [cam.id]);
 
   return (
     <div className={"feed" + (onAir ? " feed-onair" : "")}>
@@ -64,10 +66,13 @@ function LiveFeed({ cam, onAir, onClick, ptzSpeed }) {
         {!onAir && <span className="feed-hint">{cam.hint}</span>}
       </div>
       <button className="feed-img" onClick={onClick}>
-        {cam.isData
-          ? <div className="feed-data-placeholder" />
-          : <Thumb camera={cam.camera} fresh ts={ts} />
-        }
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', background: '#000' }}
+        />
         {cam.isData && (
           <div className="feed-data-overlay">
             <div className="feed-data-label">Data Projection</div>
