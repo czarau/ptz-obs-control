@@ -34,7 +34,15 @@
       "Bash(curl -sk -w \"\\\\nhttp=%{http_code} time=%{time_total}s\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&100\")",
       "Bash(curl -sk -u \"admin:admin\" --max-time 5 -w \"http=%{http_code}\" \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&home\" -o /dev/null)",
       "Bash(curl -sk -w \"\\\\nhttp=%{http_code} size=%{size_download}\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/action_snapshot\" -o /dev/null)",
-      "Bash(curl -sk -u \"admin:admin\" --digest -w \"\\\\nhttp=%{http_code} size=%{size_download}\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/action_snapshot\" -o /dev/null)"
+      "Bash(curl -sk -u \"admin:admin\" --digest -w \"\\\\nhttp=%{http_code} size=%{size_download}\\\\n\" --max-time 10 \"https://srv-syd05.chatswoodchurch.org:8806/action_snapshot\" -o /dev/null)",
+      "Bash(curl -sk --max-time 8 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26poscall%26100\")",
+      "Bash(curl -sk --max-time 8 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26poscall%26150\")",
+      "Bash(curl -sk --max-time 8 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26poscall%261\")",
+      "Bash(curl -sk --max-time 15 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=1\")",
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26poscall%26100\")",
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26posset%26100\")",
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26left%2612%2612\")",
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26ptzstop\")"
     ]
   }
 }

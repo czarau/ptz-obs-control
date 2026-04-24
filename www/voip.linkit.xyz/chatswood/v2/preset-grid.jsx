@@ -384,12 +384,32 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     }
   }, [queueRunning]);
 
+  // Snapshot the camera's current view into the given thumb slot. Used
+  // whenever a camera is about to leave its "at-position" preset so the
+  // stored thumbnail stays in sync with what the camera was showing.
+  const snapshotActiveOnCam = (cam) => {
+    const currentId = activeByCamRef.current[cam];
+    if (!currentId) return;
+    const m = currentId.match(/-(\d+)$/);
+    if (!m) return;
+    const slot = parseInt(m[1], 10);
+    const camN = Number(cam);
+    if (window.capturePresetThumb) {
+      window.capturePresetThumb(camN, slot).then(ok => {
+        if (ok) setRefreshMap(rm => ({ ...rm, [currentId]: Date.now() }));
+      });
+    }
+  };
+
   // Clear the "at-position" marker for a camera whenever it's manually jogged
   // (PTZPad in live-feeds.jsx dispatches this event on pan/tilt/zoom).
   useEffectPG(() => {
     const onManualMove = (e) => {
       const cam = String(e.detail?.camera || '');
       if (!cam) return;
+      // Capture the outgoing preset's view before clearing so its thumb
+      // reflects what the camera was looking at pre-jog.
+      snapshotActiveOnCam(cam);
       setActiveByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
       setMotionByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
     };
@@ -492,6 +512,11 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       // liveId update happens in the useEffect above when liveCamera changes.
       return;
     }
+
+    // Before sending the camera elsewhere, capture whatever it's currently
+    // showing so the outgoing preset's thumb stays accurate. Safe no-op if
+    // nothing was armed on this camera.
+    snapshotActiveOnCam(cam);
 
     // First click → send the camera to this preset
     moveCamera(preset);
