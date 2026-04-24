@@ -3,14 +3,14 @@ const { useState: useStateTB, useEffect: useEffectTB } = React;
 
 function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend, showActivity, setShowActivity }) {
   const cues = [
-    { t: "10:30", label: "Welcome",        who: "Pastor J." },
-    { t: "10:33", label: "Announcements",  who: "Sarah K." },
-    { t: "10:38", label: "Opening Songs",  who: "Worship" },
-    { t: "10:46", label: "Prayer",         who: "Pastor J." },
-    { t: "10:50", label: "Worship",        who: "Worship" },
-    { t: "11:02", label: "Sermon",         who: "Pastor J." },
-    { t: "11:28", label: "Closing Song",   who: "Worship" },
-    { t: "11:34", label: "Closing Prayer", who: "Pastor J." },
+    { t: "11:15", label: "Welcome",        who: "Sarah K." },
+    { t: "11:20", label: "Announcements",  who: "Sarah K." },
+    { t: "11:30", label: "Opening Songs",  who: "Worship" },
+    { t: "11:45", label: "Prayer",         who: "Pastor M." },
+    { t: "11:50", label: "Worship",        who: "Worship" },
+    { t: "12:00", label: "Sermon",         who: "Pastor M." },
+    { t: "12:30", label: "Closing Song",   who: "Worship" },
+    { t: "12:35", label: "Closing Prayer", who: "Pastor M." },
   ];
 
   const [now, setNow] = useStateTB(() => new Date());
@@ -52,7 +52,6 @@ function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend, showActivity, se
       <div className="topbar-right">
         <ActivityToggle open={showActivity} onClick={() => setShowActivity(v => !v)} />
         <button className="legend-btn" onClick={() => setShowLegend(v => !v)}>
-          <kbd>?</kbd>
           <span>Shortcuts</span>
         </button>
         <div className="clock">
@@ -65,31 +64,14 @@ function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend, showActivity, se
 }
 
 function ShortcutLegend({ onClose }) {
+  // Operational shortcuts (audio / lights / cameras / presets / broadcast)
+  // were removed to prevent misfires during live services. Only PTZ jog
+  // remains — everything else is driven from the on-screen buttons.
   const groups = [
-    { title: "Cameras", items: [
-      ["1 – 9", "Switch preset (current column)"],
-      ["Q / W / E / R", "Columns: Speaker / Piano / Singers / Congregation"],
-      ["Space", "Take selected → LIVE"],
-      ["N", "Advance auto queue"],
-    ]},
     { title: "PTZ", items: [
-      ["Arrow keys", "Pan/tilt active camera"],
+      ["Arrow keys", "Pan / tilt active camera"],
       ["+ / −", "Zoom in / out"],
       ["Shift + Arrow", "Fine adjust"],
-      ["0 – 9", "Recall PTZ preset"],
-    ]},
-    { title: "Broadcast", items: [
-      ["⌘ R", "Start / stop record"],
-      ["⌘ L", "Start / stop stream"],
-      ["⌘ .", "Emergency cut to holding slide"],
-      ["O", "Toggle overlay"],
-      ["T", "Toggle lower third"],
-    ]},
-    { title: "Audio / Lights", items: [
-      ["A", "Cycle audio source"],
-      ["M", "Mute master"],
-      ["F1 – F5", "Light scenes"],
-      ["`", "Toggle this panel"],
     ]},
   ];
   return (

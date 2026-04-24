@@ -161,9 +161,13 @@ function App() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  // Keyboard shortcuts. Arrow keys / +/- pulse the currently live camera's
-  // PTZ. Shift slows them down for fine adjustments. Non-PTZ ones handled
-  // inline as before.
+  // Keyboard shortcuts — PTZ only. Arrow keys pulse pan/tilt on the
+  // currently-live physical camera; +/− pulse zoom; Shift slows both down
+  // for fine adjustments. Escape stays because it's the standard close-
+  // modal affordance (legend overlay, activity panel). Operational
+  // shortcuts for TAKE / queue / emergency / record / stream / audio /
+  // lights / preset recall have all been removed — everything is driven
+  // from the UI buttons, which eliminates misfires during live services.
   useEffect(() => {
     const onKey = (e) => {
       // Don't hijack keys typed into inputs (prompt boxes, future form fields).
@@ -171,22 +175,6 @@ function App() {
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
 
       if (e.key === "Escape") { setShowLegend(false); setShowActivity(false); return; }
-      if (e.key === "?") { setShowLegend(v => !v); return; }
-      if (e.key.toLowerCase() === "l" && !e.metaKey && !e.ctrlKey) { setShowActivity(v => !v); return; }
-      if (e.key === "`") { setShowLegend(v => !v); return; }
-      if (e.key === " ") { e.preventDefault(); onTake(); return; }
-      if (e.key.toLowerCase() === "n") { advanceQueue(); return; }
-      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); onEmergency(); return; }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {
-        e.preventDefault();
-        if (window.OBS) window.OBS.toggleRecord().catch(() => {});
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "l") {
-        e.preventDefault();
-        if (window.OBS) window.OBS.toggleStream().catch(() => {});
-        return;
-      }
 
       // PTZ shortcuts act on the currently-live physical camera.
       if (!liveCamera || liveCamera === 0) return;
