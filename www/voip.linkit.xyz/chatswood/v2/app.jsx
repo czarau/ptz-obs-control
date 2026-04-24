@@ -125,9 +125,11 @@ function App() {
   };
 
   const onTake = () => {
-    // TAKE = commit selected live camera to program. The live feed click
-    // already switches scenes; TAKE is a no-op for now until a preview/program
-    // split is wired up.
+    // TAKE button is the mouse equivalent of Space — commit the currently
+    // cued scene to program. No-op if nothing is cued. Both routes go
+    // through takeCuedScene so the ping-pong + break-detector flow are
+    // identical whichever path the operator uses.
+    takeCuedScene();
   };
 
   // Poll OBS record/stream status + stats. We derive start-at-timestamps
