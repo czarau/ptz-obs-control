@@ -310,6 +310,12 @@ em { font-style: normal; }
 /* Live feeds are draggable — show grab cursor on the feed card */
 .feed[draggable="true"] { cursor: grab; }
 .feed[draggable="true"]:active { cursor: grabbing; }
+/* Preset thumbs with saved positions can be dragged onto another thumb to
+ * copy their values + image. Cursor hints this without adding UI weight.
+ * Applies only when draggable="true" — presets with no abs values stay
+ * pointer-cursored so the drag affordance matches what'll actually work. */
+.thumb[draggable="true"] { cursor: grab; }
+.thumb[draggable="true"]:active { cursor: grabbing; }
 @keyframes thumb-motion {
   0%   { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 10px rgba(245,158,11,0.35); }
   100% { border-color: var(--border); box-shadow: none; }

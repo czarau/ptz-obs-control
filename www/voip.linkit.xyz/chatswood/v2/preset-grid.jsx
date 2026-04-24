@@ -38,7 +38,11 @@ const CAM_BASE_PG = {
   '2': 'https://srv-syd05.chatswoodchurch.org:8807',
   '3': 'https://srv-syd05.chatswoodchurch.org:8808',
 };
-const MOTION_MS = 5000; // border flashes for this long after goto; thumb refreshes on completion
+// Motion marker + thumb refresh are driven by PTZState.settle() — it polls
+// the camera's VISCA position until two consecutive reads match, so we find
+// out the camera has arrived within ~600ms of it actually stopping. No fixed
+// timeout. settle() caps at 8s maxWait internally if the camera never
+// stabilises, so we're guaranteed to clear eventually.
 
 function presetFor(slot) {
   const raw = (window.LS_CONFIG?.presets || [])[slot];
@@ -300,11 +304,43 @@ const PRESET_ACTIONS = {
   },
 };
 
-function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onClick, onContextMenu, onDropCamera, queueBadge }) {
+// Custom MIME types for the two drop flavours. Kept distinct so a random
+// drag (text, file, tab URL) can never accidentally rewrite a preset.
+const MIME_CAMERA = 'application/x-ls-camera';       // live-feed → preset (capture live PTZ)
+const MIME_PRESET = 'application/x-ls-preset-slot';  // preset   → preset (copy saved values)
+
+function ThumbCard({ preset, id, onAir, selected, inMotion, refreshTs, compact, onClick, onContextMenu, onDropCamera, onDropPreset, queueBadge }) {
   const [dragOver, setDragOver] = useStatePG(false);
 
-  // Accept drops that carry a camera number (set by LiveFeed's onDragStart).
-  const acceptsDrop = (e) => e.dataTransfer.types.includes('application/x-ls-camera');
+  // Only presets with saved abs values make sense as a drag SOURCE — there's
+  // nothing to copy otherwise. Labels stay with the destination on drop.
+  const canDrag = hasAbsPosition(preset);
+
+  const onDragStart = (e) => {
+    if (!canDrag) { e.preventDefault(); return; }
+    e.dataTransfer.setData(MIME_PRESET, JSON.stringify({
+      sourceId: id,
+      slot: preset.slot,
+      presetId: preset.presetId,
+      camera: preset.camera,
+      pan: preset.pan,
+      tilt: preset.tilt,
+      zoom: preset.zoom,
+      focus: preset.focus,
+      label: preset.label,
+    }));
+    e.dataTransfer.setData('text/plain', preset.label || `slot ${preset.slot}`);
+    e.dataTransfer.effectAllowed = 'copy';
+    window.Log?.add('camera', `Drag start · ${preset.label}`, 'drop on another thumb to copy');
+  };
+
+  // Accept either a live-feed drop (live PTZ → save here) or another thumb
+  // drop (copy that preset's saved values here).
+  const typesOf = (e) => e.dataTransfer.types;
+  const hasCamera = (e) => typesOf(e).includes(MIME_CAMERA);
+  const hasPreset = (e) => typesOf(e).includes(MIME_PRESET);
+  const acceptsDrop = (e) => hasCamera(e) || hasPreset(e);
+
   const onDragOver = (e) => {
     if (!acceptsDrop(e)) return;
     e.preventDefault();
@@ -316,7 +352,16 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
     if (!acceptsDrop(e)) return;
     e.preventDefault();
     setDragOver(false);
-    const cam = parseInt(e.dataTransfer.getData('application/x-ls-camera'), 10);
+    if (hasPreset(e)) {
+      try {
+        const source = JSON.parse(e.dataTransfer.getData(MIME_PRESET));
+        if (source && source.sourceId && source.sourceId !== id && onDropPreset) {
+          onDropPreset(source);
+        }
+      } catch (_) { /* bad payload — ignore */ }
+      return;
+    }
+    const cam = parseInt(e.dataTransfer.getData(MIME_CAMERA), 10);
     if (cam >= 1 && cam <= 3 && onDropCamera) onDropCamera(cam);
   };
 
@@ -332,6 +377,8 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
       }
       onClick={onClick}
       onContextMenu={onContextMenu}
+      draggable={canDrag}
+      onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -350,7 +397,7 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
   );
 }
 
-function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop }) {
+function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, onThumbCopy }) {
   const presets = bucket.slots.map(presetFor);
   return (
     <div className="pcol" style={{ gridColumn: `span ${bucket.span}` }}>
@@ -365,6 +412,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
           return (
             <ThumbCard
               key={id}
+              id={id}
               preset={p}
               onAir={liveId === id}
               selected={isActive && liveId !== id}
@@ -373,6 +421,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, bucket)}
               onDropCamera={(cam) => onThumbDrop(id, p, cam)}
+              onDropPreset={(source) => onThumbCopy(id, p, source)}
             />
           );
         })}
@@ -383,7 +432,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
 
 const QUEUE_BUCKET = { key: 'queue', title: 'Queue', slots: QUEUE_SLOTS, cols: 2, span: 2 };
 
-function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, queueLiveIdx, queueTimer }) {
+function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, onThumbCopy, queueLiveIdx, queueTimer }) {
   return (
     <div className="pcol pcol-queue" style={{ gridColumn: "span 2" }}>
       <div className="pcol-head pcol-head-queue">
@@ -411,6 +460,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
           return (
             <ThumbCard
               key={slot}
+              id={id}
               preset={p}
               onAir={onAir}
               selected={isActive && !onAir}
@@ -420,6 +470,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, QUEUE_BUCKET)}
               onDropCamera={(cam) => onThumbDrop(id, p, cam)}
+              onDropPreset={(source) => onThumbCopy(id, p, source)}
             />
           );
         })}
@@ -481,10 +532,23 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       moveCamera(nextPreset);
       setActiveByCam(m => ({ ...m, [nextCam]: nextId }));
       setMotionByCam(m => ({ ...m, [nextCam]: nextId }));
-      setTimeout(() => {
+      // Clear motion + refresh thumb as soon as the camera actually settles,
+      // rather than at a fixed 5s wall clock.
+      window.PTZState?.settle(nextPreset.camera).then(() => {
+        if (activeByCamRef.current[nextCam] !== nextId) return; // superseded
         setMotionByCam(m => (m[nextCam] === nextId ? { ...m, [nextCam]: null } : m));
-        setRefreshMap(m => ({ ...m, [nextId]: Date.now() }));
-      }, MOTION_MS);
+        const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+        const bump = () => setRefreshMap(m => ({ ...m, [nextId]: Date.now() }));
+        const web = window.capturePresetThumb
+          ? window.capturePresetThumb(Number(nextPreset.camera), nextPreset.slot)
+          : Promise.resolve(false);
+        web.then(ok => {
+          if (ok) { bump(); return; }
+          fetch(`${endpoint}?cmd=thumb&camera=${nextPreset.camera}&id=${nextPreset.presetId}&ts=${Date.now()}`)
+            .then(() => bump())
+            .catch(() => {});
+        });
+      });
     }
 
     window.Log?.add('live', `Queue · take #${qIdx + 1}`, `${preset.label} · ${t}s`);
@@ -697,6 +761,66 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       });
   };
 
+  // Preset-to-preset copy. Dragging thumb A onto thumb B copies A's saved
+  // pan/tilt/zoom/focus (and camera) into B, plus duplicates A's cached
+  // thumb image onto B so the dest tile visually matches. The destination's
+  // label and timeout are kept intact — operators lay out their grid by
+  // role, not by source.
+  const onThumbCopy = (destId, destPreset, source) => {
+    if (!source || source.pan == null || source.tilt == null) {
+      window.Log?.add('error', `Copy failed · source has no saved position`);
+      return;
+    }
+    const destLabel = destPreset.label || `slot ${destPreset.slot}`;
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+
+    window.Log?.add(
+      'camera',
+      `Copy · ${source.label || 'preset'} → ${destLabel}`,
+      `cam ${source.camera} · p=${source.pan} t=${source.tilt} z=${source.zoom ?? '-'} f=${source.focus ?? '-'}`
+    );
+
+    // 1. Persist the copied values into the destination slot.
+    const params = new URLSearchParams({
+      cmd: 'set_preset',
+      user: PRESET_ACTIONS.user(),
+      id: String(destPreset.slot),
+      camera: String(source.camera),
+      label: destPreset.label || 'Preset',
+      pan:   String(source.pan),
+      tilt:  String(source.tilt),
+      ts: String(Date.now()),
+    });
+    if (source.zoom  != null) params.set('zoom',  String(source.zoom));
+    if (source.focus != null) params.set('focus', String(source.focus));
+    const save = fetch(`${endpoint}?${params}`)
+      .then(() => {
+        // Keep in-memory config in sync so the next click hits the abs path.
+        if (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.presets)) {
+          const existing = window.LS_CONFIG.presets[destPreset.slot] || {};
+          window.LS_CONFIG.presets[destPreset.slot] = {
+            ...existing,
+            camera: String(source.camera),
+            pan: source.pan,
+            tilt: source.tilt,
+            zoom: source.zoom,
+            focus: source.focus,
+          };
+        }
+      });
+
+    // 2. Duplicate the source thumbnail on disk onto the dest's presetId.
+    //    No camera round-trip needed — the source's cached image is already
+    //    the correct view for these coordinates.
+    const copyThumb = fetch(
+      `${endpoint}?cmd=copy_thumb&from=${source.presetId}&to=${destPreset.presetId}&ts=${Date.now()}`
+    ).catch(() => {});
+
+    Promise.all([save, copyThumb])
+      .then(() => setRefreshMap(m => ({ ...m, [destId]: Date.now() + 1 })))
+      .catch(err => window.Log?.add('error', `Copy failed · ${destLabel}`, String(err)));
+  };
+
   const onThumbClick = async (id, preset) => {
     const cam = String(preset.camera);
 
@@ -717,45 +841,37 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     moveCamera(preset);
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setMotionByCam(m => ({ ...m, [cam]: id }));
-    setTimeout(() => {
-      // Only act if this preset is still the latest target for the camera.
-      // If the user clicked another thumb on the same camera (or jogged PTZ
-      // manually) before we arrived, the camera is heading somewhere else
-      // now — don't clear the new motion marker and don't refresh this thumb
-      // with what would be a transitional / wrong frame.
-      let stillValid = false;
-      setMotionByCam(m => {
-        if (m[cam] !== id) return m;
-        stillValid = true;
-        return { ...m, [cam]: null };
-      });
-      if (stillValid) {
-        // Pull a fresh snapshot of the camera's NEW position (it's arrived)
-        // and write it to the cache. Bump refreshMap only after the file
-        // is on disk so the thumb reloads with the new frame, not a stale
-        // copy. Try the instant WebRTC path first, fall back to server
-        // action_snapshot if no frame is available.
-        const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-        const bump = () => setRefreshMap(m => ({ ...m, [id]: Date.now() }));
-        const web = window.capturePresetThumb
-          ? window.capturePresetThumb(Number(preset.camera), preset.slot)
-          : Promise.resolve(false);
-        web.then(ok => {
-          if (ok) { bump(); return; }
-          fetch(`${endpoint}?cmd=thumb&camera=${preset.camera}&id=${preset.presetId}&ts=${Date.now()}`)
-            .then(() => bump())
-            .catch(() => {});
-        });
-      }
-    }, MOTION_MS);
 
-    // Poll the camera's pan/tilt/zoom/focus until it stops moving, then log
-    // the final coordinates alongside the preset label. `settle()` keeps
-    // sampling (~600 ms apart, up to 8 s) until two consecutive reads match.
-    // Same staleness guard: if the camera has been redirected since this
-    // click, skip the "Arrived" log for this preset.
+    // Wait for the camera to actually arrive before touching motion marker /
+    // thumb / log. `settle()` polls VISCA ~600 ms apart until two consecutive
+    // reads match, or 8 s max. Much tighter than the old fixed 5 s timeout —
+    // small pans clear in ~1 s, slow focus pulls get the extra headroom.
+    //
+    // Staleness guard: if the user clicked another thumb on the same camera
+    // (or jogged PTZ) before we arrived, bail — the newer action owns the
+    // motion marker and thumb refresh.
     window.PTZState?.settle(preset.camera).then(pos => {
       if (activeByCamRef.current[cam] !== id) return; // superseded
+
+      setMotionByCam(m => (m[cam] === id ? { ...m, [cam]: null } : m));
+
+      // Pull a fresh snapshot of the now-stationary view. WebRTC frame first
+      // (instant, no camera round-trip), fall back to server action_snapshot
+      // if the <video> hasn't buffered. Bump refreshMap only after the file
+      // is on disk so the <img> reloads the new frame, not the stale copy.
+      const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+      const bump = () => setRefreshMap(m => ({ ...m, [id]: Date.now() }));
+      const web = window.capturePresetThumb
+        ? window.capturePresetThumb(Number(preset.camera), preset.slot)
+        : Promise.resolve(false);
+      web.then(ok => {
+        if (ok) { bump(); return; }
+        fetch(`${endpoint}?cmd=thumb&camera=${preset.camera}&id=${preset.presetId}&ts=${Date.now()}`)
+          .then(() => bump())
+          .catch(() => {});
+      });
+
+      // Log the settled coordinates.
       if (pos) {
         window.Log?.add(
           'camera',
@@ -782,6 +898,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
           onThumbClick={onThumbClick}
           onThumbContext={onThumbContext}
           onThumbDrop={onThumbDrop}
+          onThumbCopy={onThumbCopy}
         />
       ))}
       <AutoQueueColumn
@@ -795,6 +912,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         onThumbClick={onThumbClick}
         onThumbContext={onThumbContext}
         onThumbDrop={onThumbDrop}
+        onThumbCopy={onThumbCopy}
         queueLiveIdx={queueLiveIdx}
         queueTimer={queueTimer}
       />

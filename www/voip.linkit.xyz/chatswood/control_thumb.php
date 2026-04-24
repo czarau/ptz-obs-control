@@ -98,6 +98,33 @@
       echo file_get_contents("thumbs/_blank.jpg");
     }
   }
+  elseif ($_GET['cmd'] == 'copy_thumb')
+  {
+    // Duplicate a cached thumbnail from one preset slot to another, so a
+    // preset-to-preset drag can mirror the source's image instantly without
+    // a camera round-trip. Paths are whitelisted to numeric filenames under
+    // thumbs/ — never follow attacker-supplied paths.
+    //   ?cmd=copy_thumb&from=120&to=105
+    $from = $_GET['from'] ?? '';
+    $to   = $_GET['to']   ?? '';
+    if (!preg_match('/^\d+$/', $from) || !preg_match('/^\d+$/', $to)) {
+      http_response_code(400);
+      echo json_encode(['error' => 'from/to must be numeric preset IDs']);
+      die;
+    }
+    $src = __DIR__ . "/thumbs/{$from}.jpg";
+    $dst = __DIR__ . "/thumbs/{$to}.jpg";
+    header('Content-Type: application/json');
+    if (!is_file($src)) {
+      echo json_encode(['error' => "source thumb {$from}.jpg does not exist"]);
+      die;
+    }
+    if (!@copy($src, $dst)) {
+      echo json_encode(['error' => "copy failed: {$from} → {$to}"]);
+      die;
+    }
+    echo json_encode(['ok' => true, 'from' => (int)$from, 'to' => (int)$to]);
+  }
   elseif ($_GET['cmd'] == 'cgi')
   {
     // Browser-friendly passthrough for the camera's /cgi-bin/ptzctrl.cgi
