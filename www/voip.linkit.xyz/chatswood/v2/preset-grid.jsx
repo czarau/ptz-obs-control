@@ -96,6 +96,17 @@ function moveCamera(preset) {
         } else if (!trimmed) {
           window.Log?.add('error', `goto_abs empty response · Cam ${preset.camera}`,
             'PHP/python returned nothing — check cam_control.py stderr');
+        } else if (data && Array.isArray(data.steps)) {
+          // Per-axis log from cam_control.py. 'COMPLETE' means the camera
+          // accepted that axis; anything else (hex bytes, 'ERROR', null) is
+          // either a VISCA error (e.g. Command Not Executable on focus
+          // while AF is on) or a timeout/unknown response. Flag the bad
+          // ones individually so we know which axis to investigate.
+          const bad = data.steps.filter(s => s.response !== 'COMPLETE');
+          if (bad.length) {
+            window.Log?.add('error', `goto_abs partial · Cam ${preset.camera}`,
+              bad.map(s => `${s.axis}=${s.response ?? 'null'}`).join(' · '));
+          }
         }
       })
       .catch(err => {

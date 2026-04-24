@@ -198,7 +198,20 @@ args = parser.parse_args()
 
 cam = CameraPTZOptics(args.ip, args.port)
 
-response = '';
+# VISCA responses come back as either the string 'COMPLETE' / 'ERROR' or raw
+# bytes when the camera returns something _receive_response doesn't classify
+# (e.g. a 4-byte 90-60-XX-FF error which the existing length==3 check
+# misses). Bytes blow up json.dumps, so normalise everything through this
+# helper before stuffing into _out.
+def _jsonable(r):
+    if r is None or r == '':
+        return None
+    if isinstance(r, (bytes, bytearray)):
+        return r.hex()
+    return str(r)
+
+response = ''
+steps = []  # per-axis responses for goto_abs so we can see which step failed
 
 if args.cmd == 'goto':
     #print("Sending To Preset 100...")
@@ -220,13 +233,21 @@ if args.cmd == 'focus_onepush':
 if args.cmd == 'goto_abs':
     # Send the camera to an absolute pan/tilt/zoom/focus read from JSON
     # rather than an onboard preset slot. Immune to firmware preset wipes.
-    # Any omitted axis is left untouched.
+    # Any omitted axis is left untouched. Each axis's raw response is
+    # recorded so the PHP / JS activity log can identify which step the
+    # camera rejected (e.g. focus-direct while AF is on).
     if args.pan is not None and args.tilt is not None:
-        response = cam.set_pantilt_position(args.pan, args.tilt)
+        r = cam.set_pantilt_position(args.pan, args.tilt)
+        steps.append({"axis": "pantilt", "response": _jsonable(r)})
+        response = r
     if args.zoom is not None:
-        response = cam.set_zoom_position(args.zoom)
+        r = cam.set_zoom_position(args.zoom)
+        steps.append({"axis": "zoom", "response": _jsonable(r)})
+        response = r
     if args.focus is not None:
-        response = cam.set_focus_position(args.focus)
+        r = cam.set_focus_position(args.focus)
+        steps.append({"axis": "focus", "response": _jsonable(r)})
+        response = r
 
 #print("Getting PTZ Position...")
 pan, tilt = cam.get_pantilt_position();
@@ -244,7 +265,10 @@ _out = {
     "zoom":   zoom,
     "focus":  focus,
 }
-if response != '':
-    _out["response"] = response
+safe_response = _jsonable(response)
+if safe_response is not None:
+    _out["response"] = safe_response
+if steps:
+    _out["steps"] = steps
 
 print(_json.dumps(_out))
