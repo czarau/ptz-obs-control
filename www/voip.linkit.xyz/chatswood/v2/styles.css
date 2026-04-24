@@ -284,7 +284,7 @@ em { font-style: normal; }
   min-height: 0;
 }
 .thumb:hover { border-color: var(--border-strong); }
-.thumb.selected { border-color: var(--text-3); }
+.thumb.selected { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 12px rgba(245,158,11,0.2); }
 .thumb.onair { border-color: var(--live); box-shadow: 0 0 0 1px var(--live), 0 0 16px rgba(34,197,94,0.25); }
 .thumb.in-motion { animation: thumb-motion 0.55s ease-in-out infinite alternate; }
 @keyframes thumb-motion {
@@ -294,6 +294,7 @@ em { font-style: normal; }
 .thumb-img { position: relative; background: #000; overflow: hidden; flex: 0 0 auto; width: 100%; aspect-ratio: 16 / 9; }
 .thumb-img svg { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
 .thumb-livebadge { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--live); color: #04130a; padding: 1px 5px; border-radius: 3px; }
+.thumb-cuebadge  { position: absolute; top: 4px; left: 4px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; background: var(--warn); color: #1a1205; padding: 1px 5px; border-radius: 3px; }
 .thumb-timer { position: absolute; top: 4px; right: 4px; font-family: var(--font-mono); font-size: 9.5px; color: var(--text); background: rgba(0,0,0,0.6); padding: 1px 5px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.08); }
 .thumb-meta { display: flex; align-items: center; gap: 6px; padding: 5px 7px; height: 28px; flex: 0 0 28px; box-sizing: border-box; }
 .thumb-num { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--text-3); background: var(--surf-3); padding: 1px 5px; border-radius: 3px; min-width: 16px; text-align: center; }
