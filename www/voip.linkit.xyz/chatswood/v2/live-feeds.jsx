@@ -111,7 +111,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
     //      panel reads like a rundown.
     const items = [
       {
-        label: 'Update',
+        label: 'Update Presets',
         icon: <Icon name="rotate" size={13}/>,
         onClick: async () => {
           const presets = (window.LS_CONFIG?.presets || []);
