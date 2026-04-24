@@ -598,6 +598,14 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
   };
 
   const advanceQueueInternal = () => {
+    // Skip is a running-queue action. Clicking it while paused shouldn't
+    // jump the cue forward without the operator first pressing Running —
+    // otherwise you end up "ahead" of yourself when you do resume, and
+    // the live scene won't match the item the queue thinks is playing.
+    if (!queueRunning) {
+      window.Log?.add('live', 'Queue paused', 'Skip ignored — press Running first');
+      return;
+    }
     const next = (queueLiveIdxRef.current + 1) % QUEUE_SLOTS.length;
     takeQueueItem(next);
   };
@@ -615,74 +623,24 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     return () => clearInterval(id);
   }, [queueRunning]);
 
-  // Grace window: after a queue take (kickoff OR advance) we need a
-  // beat for React's batched state updates + the ~1s OBS scene poll to
-  // settle before the interrupt detector starts comparing. Without it
-  // the detector can fire BEFORE takeQueueItem's setLiveCam has
-  // propagated — the freshly-started queue would self-pause
-  // immediately, which is exactly the bug a naive interrupt detector
-  // has. Grace is a timestamp; the detector skips while Date.now() is
-  // under it.
-  const GRACE_MS = 2000;
-  const queueGraceRef = useRefPG(0);
-  const bumpGrace = () => { queueGraceRef.current = Date.now() + GRACE_MS; };
-
   // When the queue is turned on, kick off the first take (unless we're
-  // resuming a paused mid-item countdown). Set grace BEFORE the take
-  // so the interrupt detector that runs on the same render pass doesn't
-  // race takeQueueItem's state updates.
+  // resuming a paused mid-item countdown).
   useEffectPG(() => {
     if (queueRunning && queueTimerRef.current === 0) {
-      bumpGrace();
       takeQueueItem(queueLiveIdxRef.current);
     }
   }, [queueRunning]);
 
-  // Grace also bumps on every advance (queueLiveIdx change) — covers
-  // auto-advance ticks, manual Skip, and any other path that changes
-  // which queue slot is live.
-  useEffectPG(() => { bumpGrace(); }, [queueLiveIdx]);
-
-  // Auto-pause on operator takeover. The queue runs on two rails while
-  // live:
-  //   (a) the camera it just took live should STAY on-air until the
-  //       tick expires and the queue itself advances
-  //   (b) the pre-rolled next camera should keep its armed thumb until
-  //       the queue advances to it
-  // If either invariant is violated — operator clicks a different feed,
-  // takes a non-queue preset, or arms another preset on the pre-roll
-  // camera — the operator has clearly taken over. Pause the queue so
-  // the next tick doesn't clobber their shot. They re-arm the queue
-  // with the Running button when they're ready.
-  useEffectPG(() => {
-    if (!queueRunning) return;
-    if (queueGraceRef.current > Date.now()) return;
-
-    const curSlot  = QUEUE_SLOTS[queueLiveIdx];
-    const curPre   = presetFor(curSlot);
-    const expLive  = Number(curPre.camera);
-
-    if (Number(liveCamera) && expLive && Number(liveCamera) !== expLive) {
-      setQueueRunning(false);
-      window.Log?.add('live', 'Auto-queue paused', `Cam ${liveCamera} went live off-queue`);
-      return;
-    }
-
-    // Pre-roll check — only meaningful when the next item is on a
-    // different camera (same-cam transitions don't pre-roll).
-    const nextIdx = (queueLiveIdx + 1) % QUEUE_SLOTS.length;
-    const nextSlot = QUEUE_SLOTS[nextIdx];
-    const nextPre  = presetFor(nextSlot);
-    const nextCam  = String(nextPre.camera);
-    if (nextCam && nextCam !== String(expLive)) {
-      const expectedId = `queue-${nextSlot}`;
-      const actual = activeByCam[nextCam];
-      if (actual && actual !== expectedId) {
-        setQueueRunning(false);
-        window.Log?.add('live', 'Auto-queue paused', `pre-roll on Cam ${nextCam} was re-armed`);
-      }
-    }
-  }, [queueRunning, queueLiveIdx, liveCamera, activeByCam]);
+  // Note: a reactive interrupt-detector was attempted here (auto-pause
+  // when the operator takes over) but it raced its own trigger state.
+  // Effects run inside a render's commit phase with state frozen at
+  // that render — takeQueueItem's batched setLiveCam etc. don't flush
+  // until the NEXT render, so a naive post-commit detector always saw
+  // a mismatch between the cue and the (stale) liveCamera and paused
+  // the queue instantly. A grace window masked some cases but not all.
+  // Reverted to operator-driven pause: click the Running button when
+  // you want to stop the queue. Re-add with event-driven detection
+  // (not state reactivity) if this turns out to matter.
 
   // Snapshot the camera's current view into the given thumb slot. Hybrid:
   //  1. Prefer the instant WebRTC path — grab a frame from the live <video>
