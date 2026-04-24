@@ -122,7 +122,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
   );
 }
 
-const { useEffect: useEffectLF, useRef: useRefLF } = React;
+const { useState: useStateLF, useEffect: useEffectLF, useRef: useRefLF } = React;
 
 function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
   const videoRef = useRefLF(null);
