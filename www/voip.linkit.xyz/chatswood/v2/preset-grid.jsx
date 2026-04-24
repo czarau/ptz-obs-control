@@ -231,7 +231,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
 
 const QUEUE_BUCKET = { key: 'queue', title: 'Queue', slots: QUEUE_SLOTS, cols: 2, span: 2 };
 
-function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext }) {
+function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, queueLiveIdx, queueTimer }) {
   return (
     <div className="pcol pcol-queue" style={{ gridColumn: "span 2" }}>
       <div className="pcol-head pcol-head-queue">
@@ -245,21 +245,26 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
         </div>
       </div>
       <div className="pcol-grid" data-cols="2" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-        {QUEUE_SLOTS.map((slot) => {
+        {QUEUE_SLOTS.map((slot, idx) => {
           const p = presetFor(slot);
           const id = `queue-${slot}`;
           const cam = String(p.camera);
           const isActive = activeByCam[cam] === id;
           const isMotion = motionByCam[cam] === id;
+          const onAir = liveId === id;
+          // Live item shows a live countdown; others show their stored timeout.
+          const badge = (onAir && idx === queueLiveIdx && queueTimer != null)
+            ? queueTimer
+            : p.timeout;
           return (
             <ThumbCard
               key={slot}
               preset={p}
-              onAir={liveId === id}
-              selected={isActive && liveId !== id}
+              onAir={onAir}
+              selected={isActive && !onAir}
               inMotion={isMotion}
               refreshTs={refreshMap[id]}
-              queueBadge={p.timeout}
+              queueBadge={badge}
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, QUEUE_BUCKET)}
             />
@@ -282,6 +287,81 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
   // can see the latest value without re-registering handlers.
   const activeByCamRef = useRefPG({});
   useEffectPG(() => { activeByCamRef.current = activeByCam; }, [activeByCam]);
+
+  // --- Auto queue runtime ------------------------------------------------
+  // queueLiveIdx: index into QUEUE_SLOTS that's currently on-air.
+  // queueTimer:   seconds remaining on that item before auto-advance.
+  // While running, each tick decrements the timer; on expiry we take the
+  // next item live and (if on a different camera) pre-roll the one after it
+  // so there's always a CUE queued.
+  const [queueLiveIdx, setQueueLiveIdx] = useStatePG(0);
+  const [queueTimer, setQueueTimer] = useStatePG(0);
+  const queueLiveIdxRef = useRefPG(0);
+  const queueTimerRef = useRefPG(0);
+  useEffectPG(() => { queueLiveIdxRef.current = queueLiveIdx; }, [queueLiveIdx]);
+  useEffectPG(() => { queueTimerRef.current = queueTimer; }, [queueTimer]);
+
+  const takeQueueItem = (qIdx) => {
+    const slot = QUEUE_SLOTS[qIdx];
+    if (slot == null) return;
+    const preset = presetFor(slot);
+    const id = `queue-${slot}`;
+    const cam = String(preset.camera);
+
+    // Take live on this slot's camera.
+    takeLive(preset);
+    if (setLiveCamFromNumber) setLiveCamFromNumber(Number(preset.camera));
+    setActiveByCam(m => ({ ...m, [cam]: id }));
+    setQueueLiveIdx(qIdx);
+    const t = Number(preset.timeout) || 10;
+    setQueueTimer(t);
+
+    // Pre-roll the next queue item's camera — but only if it's a DIFFERENT
+    // camera from the one we just took live. Moving the current live camera
+    // would yank the program feed off-shot.
+    const nextIdx = (qIdx + 1) % QUEUE_SLOTS.length;
+    const nextSlot = QUEUE_SLOTS[nextIdx];
+    const nextPreset = presetFor(nextSlot);
+    const nextId = `queue-${nextSlot}`;
+    const nextCam = String(nextPreset.camera);
+    if (nextCam && nextCam !== cam) {
+      moveCamera(nextPreset);
+      setActiveByCam(m => ({ ...m, [nextCam]: nextId }));
+      setMotionByCam(m => ({ ...m, [nextCam]: nextId }));
+      setTimeout(() => {
+        setMotionByCam(m => (m[nextCam] === nextId ? { ...m, [nextCam]: null } : m));
+        setRefreshMap(m => ({ ...m, [nextId]: Date.now() }));
+      }, MOTION_MS);
+    }
+
+    window.Log?.add('live', `Queue · take #${qIdx + 1}`, `${preset.label} · ${t}s`);
+  };
+
+  const advanceQueueInternal = () => {
+    const next = (queueLiveIdxRef.current + 1) % QUEUE_SLOTS.length;
+    takeQueueItem(next);
+  };
+
+  // Tick every second while running. Decrement, and on expiry advance.
+  useEffectPG(() => {
+    if (!queueRunning) return;
+    const id = setInterval(() => {
+      if (queueTimerRef.current <= 1) {
+        advanceQueueInternal();
+      } else {
+        setQueueTimer(t => t - 1);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [queueRunning]);
+
+  // When the queue is turned on, kick off the first take (unless we're
+  // resuming a paused mid-item countdown).
+  useEffectPG(() => {
+    if (queueRunning && queueTimerRef.current === 0) {
+      takeQueueItem(queueLiveIdxRef.current);
+    }
+  }, [queueRunning]);
 
   // Clear the "at-position" marker for a camera whenever it's manually jogged
   // (PTZPad in live-feeds.jsx dispatches this event on pan/tilt/zoom).
@@ -439,13 +519,15 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       <AutoQueueColumn
         running={queueRunning}
         setRunning={setQueueRunning}
-        advance={advanceQueue}
+        advance={advanceQueueInternal}
         liveId={liveId}
         activeByCam={activeByCam}
         motionByCam={motionByCam}
         refreshMap={refreshMap}
         onThumbClick={onThumbClick}
         onThumbContext={onThumbContext}
+        queueLiveIdx={queueLiveIdx}
+        queueTimer={queueTimer}
       />
       <ContextMenu state={menu.state} onClose={menu.close} />
     </div>
