@@ -203,6 +203,14 @@ const PRESET_ACTIONS = {
       ts: String(Date.now()),
     });
     fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    // Keep in-memory config in sync so presetFor() picks up the new label
+    // on the next render. The caller must still bump refreshMap (or any
+    // other state) to trigger that render — this function doesn't have
+    // access to React state setters.
+    if (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.presets)) {
+      const existing = window.LS_CONFIG.presets[preset.slot] || {};
+      window.LS_CONFIG.presets[preset.slot] = { ...existing, label: newLabel };
+    }
     window.Log?.add('system', `Rename · ${preset.label} → ${newLabel}`);
   },
 
@@ -216,6 +224,12 @@ const PRESET_ACTIONS = {
       ts: String(Date.now()),
     });
     fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    // Same in-memory sync as rename — the caller bumps refreshMap to
+    // force a re-render so the queue badge shows the new timeout.
+    if (window.LS_CONFIG && Array.isArray(window.LS_CONFIG.presets)) {
+      const existing = window.LS_CONFIG.presets[preset.slot] || {};
+      window.LS_CONFIG.presets[preset.slot] = { ...existing, timeout: String(secs) };
+    }
     window.Log?.add('system', `Set timeout · ${preset.label} → ${secs}s`);
   },
 
@@ -721,7 +735,12 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         icon: ICO('edit'),
         onClick: () => {
           const next = window.prompt('Rename preset', preset.label || '');
-          if (next && next !== preset.label) PRESET_ACTIONS.rename(preset, next);
+          if (next && next !== preset.label) {
+            PRESET_ACTIONS.rename(preset, next);
+            // Force a re-render so presetFor() is re-read and the new
+            // label flows through to ThumbCard's display.
+            bumpThumb();
+          }
         },
       },
       {
@@ -731,7 +750,13 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         onClick: () => {
           const v = window.prompt('Timeout in seconds (5–60)', String(preset.timeout || 10));
           const n = Number(v);
-          if (Number.isFinite(n) && n >= 5 && n <= 60) PRESET_ACTIONS.setTimeout(preset, n);
+          if (Number.isFinite(n) && n >= 5 && n <= 60) {
+            PRESET_ACTIONS.setTimeout(preset, n);
+            // Same re-render trigger — the queue badge reads timeout
+            // from presetFor() and needs a refresh to reflect the new
+            // value without a page reload.
+            bumpThumb();
+          }
         },
       },
       { separator: true },
