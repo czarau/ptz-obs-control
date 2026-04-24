@@ -41,6 +41,43 @@ function focusCmd(camera, cmd) {
 
 function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptzSpeed }) {
   const cams = [CAM_META.back, CAM_META.left, CAM_META.right, CAM_META.data];
+  const menu = useContextMenu();
+
+  const openFeedContext = (e, c) => {
+    if (c.isData) return;
+    // "Update" iterates all presets stored for this camera, recalls each in
+    // turn, waits for arrival, and broadcasts a refresh event the PresetGrid
+    // listens for so it can bump each thumb's cache-bust timestamp.
+    const items = [
+      {
+        label: 'Update',
+        icon: '⟳',
+        onClick: () => {
+          const presets = (window.LS_CONFIG?.presets || []);
+          const startIndex = window.LS_CONFIG?.presetStartIndex || 100;
+          const matches = presets
+            .map((p, slot) => ({ p, slot }))
+            .filter(x => x.p && String(x.p.camera) === String(c.camera));
+          window.Log?.add('camera', `Update thumbs · Cam ${c.camera}`, `${matches.length} presets`);
+          const base = CAM_BASE[c.camera];
+          if (!base) return;
+          matches.forEach((x, i) => {
+            setTimeout(() => {
+              const presetId = startIndex + x.slot;
+              fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${presetId}`, { mode: 'no-cors' }).catch(() => {});
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('preset:refresh', {
+                  detail: { camera: c.camera, slot: x.slot }
+                }));
+              }, 5000);
+            }, i * 6000);
+          });
+        },
+      },
+    ];
+    menu.open(e, items);
+  };
+
   return (
     <div className="feed-row">
       {cams.map(c => (
@@ -54,16 +91,18 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
             if (window.OBS) window.OBS.switchScene(c.scene).catch(() => {});
             window.Log?.add('live', `LIVE feed → ${c.label}`, c.scene);
           }}
+          onContextMenu={(e) => openFeedContext(e, c)}
         />
       ))}
       <OverlayDock overlays={overlays} setOverlays={setOverlays} onTake={onTake}/>
+      <ContextMenu state={menu.state} onClose={menu.close} />
     </div>
   );
 }
 
 const { useEffect: useEffectLF, useRef: useRefLF } = React;
 
-function LiveFeed({ cam, onAir, onClick, ptzSpeed }) {
+function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
   const videoRef = useRefLF(null);
 
   // Spin up a WebRTC peer connection when the element mounts, tear it down on unmount.
@@ -75,7 +114,7 @@ function LiveFeed({ cam, onAir, onClick, ptzSpeed }) {
   }, [cam.id]);
 
   return (
-    <div className={"feed" + (onAir ? " feed-onair" : "")}>
+    <div className={"feed" + (onAir ? " feed-onair" : "")} onContextMenu={onContextMenu}>
       <div className="feed-head">
         <span className="feed-head-left">
           {cam.camera > 0 && (

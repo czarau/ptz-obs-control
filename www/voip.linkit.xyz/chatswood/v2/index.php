@@ -62,6 +62,7 @@
   <script src="obs-client.js"></script>
   <script src="ptz-state.js"></script>
   <script type="text/babel" src="thumbs.jsx"></script>
+  <script type="text/babel" src="context-menu.jsx"></script>
   <script type="text/babel" src="left-rail.jsx"></script>
   <script type="text/babel" src="preset-grid.jsx"></script>
   <script type="text/babel" src="live-feeds.jsx"></script>

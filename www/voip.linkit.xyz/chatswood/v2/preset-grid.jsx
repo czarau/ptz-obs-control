@@ -68,7 +68,112 @@ function takeLive(preset) {
   window.Log?.add('live', `LIVE · Cam ${preset.camera} · ${preset.label}`, sceneName);
 }
 
-function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onClick, queueBadge }) {
+// --- Right-click actions ----------------------------------------------------
+
+const PRESET_ACTIONS = {
+  endpoint: () => (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php',
+  user:     () => (window.LS_CONFIG || {}).user || 'chatswood',
+
+  // Record camera `cam`'s current position into this preset slot. When
+  // `admin` is true, write to the admin default bank instead of the user bank.
+  savePosition(preset, cam, opts = {}) {
+    const admin = !!opts.admin;
+    const startIndex = admin
+      ? (window.LS_CONFIG?.presetAdminIndex ?? 150)
+      : (window.LS_CONFIG?.presetStartIndex ?? 100);
+    const presetId = startIndex + preset.slot;
+
+    const base = CAM_BASE_PG[cam];
+    if (base) {
+      fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&posset&${presetId}`, { mode: 'no-cors' }).catch(() => {});
+    }
+
+    const params = new URLSearchParams({
+      cmd: 'set_preset',
+      user: PRESET_ACTIONS.user(),
+      id: String(preset.slot),
+      camera: String(cam),
+      label: preset.label || 'Preset',
+      ts: String(Date.now()),
+    });
+    if (admin) params.set('admin', '1');
+    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+
+    window.Log?.add(
+      admin ? 'system' : 'camera',
+      `${admin ? 'Save default' : 'Save position'} · Cam ${cam} → ${preset.label}`,
+      `preset ${presetId}`
+    );
+  },
+
+  rename(preset, newLabel) {
+    const params = new URLSearchParams({
+      cmd: 'set_preset',
+      user: PRESET_ACTIONS.user(),
+      id: String(preset.slot),
+      camera: String(preset.camera),
+      label: newLabel,
+      ts: String(Date.now()),
+    });
+    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    window.Log?.add('system', `Rename · ${preset.label} → ${newLabel}`);
+  },
+
+  setTimeout(preset, secs) {
+    const params = new URLSearchParams({
+      cmd: 'set_preset',
+      user: PRESET_ACTIONS.user(),
+      id: String(preset.slot),
+      camera: String(preset.camera),
+      timeout: String(secs),
+      ts: String(Date.now()),
+    });
+    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    window.Log?.add('system', `Set timeout · ${preset.label} → ${secs}s`);
+  },
+
+  async getAdminPreset(preset) {
+    const url = `${PRESET_ACTIONS.endpoint()}?cmd=get_preset&user=${PRESET_ACTIONS.user()}&admin=1&id=${preset.slot}&ts=${Date.now()}`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (_) { return null; }
+  },
+
+  // Restore the preset back to the admin default: recall the admin preset
+  // position on its camera, then re-record that as the user preset so the
+  // next user recall goes to the default. Also copy metadata (camera/label).
+  async restoreDefault(preset) {
+    const def = await PRESET_ACTIONS.getAdminPreset(preset);
+    if (!def || !def.camera) {
+      window.Log?.add('error', `Restore · no default for slot ${preset.slot}`);
+      return;
+    }
+    const cam = def.camera;
+    const adminId = (window.LS_CONFIG?.presetAdminIndex ?? 150) + preset.slot;
+    const userId  = (window.LS_CONFIG?.presetStartIndex ?? 100) + preset.slot;
+    const base = CAM_BASE_PG[cam];
+    if (base) {
+      fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${adminId}`, { mode: 'no-cors' }).catch(() => {});
+      // Wait for the camera to arrive before snapshotting back to the user slot.
+      await new Promise(r => setTimeout(r, 5000));
+      fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&posset&${userId}`, { mode: 'no-cors' }).catch(() => {});
+    }
+    const params = new URLSearchParams({
+      cmd: 'set_preset',
+      user: PRESET_ACTIONS.user(),
+      id: String(preset.slot),
+      camera: String(cam),
+      label: def.label || preset.label || 'Preset',
+      ts: String(Date.now()),
+    });
+    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`).catch(() => {});
+    window.Log?.add('system', `Restore default · Cam ${cam} · ${def.label || preset.label}`);
+  },
+};
+
+function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onClick, onContextMenu, queueBadge }) {
   return (
     <button
       className={
@@ -79,6 +184,7 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
         + (compact ? " compact" : "")
       }
       onClick={onClick}
+      onContextMenu={onContextMenu}
     >
       <div className="thumb-img">
         <Thumb presetId={preset.presetId} camera={preset.camera} fresh={!!refreshTs} ts={refreshTs} />
@@ -94,7 +200,7 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
   );
 }
 
-function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick }) {
+function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext }) {
   const presets = bucket.slots.map(presetFor);
   return (
     <div className="pcol" style={{ gridColumn: `span ${bucket.span}` }}>
@@ -115,6 +221,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
               inMotion={isMotion}
               refreshTs={refreshMap[id]}
               onClick={() => onThumbClick(id, p)}
+              onContextMenu={(e) => onThumbContext(e, id, p, bucket)}
             />
           );
         })}
@@ -156,13 +263,14 @@ function AutoQueueColumn({ items, running, setRunning, liveIdx, advance }) {
   );
 }
 
-function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, queueRunning, setQueueRunning, queueIdx, advanceQueue, showCustom }) {
+function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, queueRunning, setQueueRunning, queueIdx, advanceQueue, showCustom }) {
   // Per-camera state: each camera has at most one "at-position" preset (the
   // last one it moved to) and at most one "in-motion" preset.
   const [activeByCam, setActiveByCam] = useStatePG({});
   const [motionByCam, setMotionByCam] = useStatePG({});
   // Thumb-id → timestamp. When set, ThumbCard requests a fresh snapshot.
   const [refreshMap, setRefreshMap] = useStatePG({});
+  const menu = useContextMenu();
 
   // Clear the "at-position" marker for a camera whenever it's manually jogged
   // (PTZPad in live-feeds.jsx dispatches this event on pan/tilt/zoom).
@@ -173,8 +281,23 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, queueRu
       setActiveByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
       setMotionByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
     };
+    // Live-feed "Update" sweep dispatches this per preset as it arrives.
+    const onPresetRefresh = (e) => {
+      const cam = String(e.detail?.camera);
+      const slot = e.detail?.slot;
+      if (slot == null) return;
+      // Match the slot within any bucket; the id shape is "<bucketKey>-<slot>".
+      const id = SLOT_BUCKETS.find(b => b.slots.includes(slot));
+      if (!id) return;
+      const thumbId = `${id.key}-${slot}`;
+      setRefreshMap(m => ({ ...m, [thumbId]: Date.now() }));
+    };
     window.addEventListener('ptz:manual-move', onManualMove);
-    return () => window.removeEventListener('ptz:manual-move', onManualMove);
+    window.addEventListener('preset:refresh', onPresetRefresh);
+    return () => {
+      window.removeEventListener('ptz:manual-move', onManualMove);
+      window.removeEventListener('preset:refresh', onPresetRefresh);
+    };
   }, []);
 
   // Whenever the live camera changes (scene switch via feed click, preset take,
@@ -186,6 +309,54 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, queueRu
     const id = activeByCam[cam] || null;
     setLive(curr => (curr === id ? curr : id));
   }, [liveCamera, activeByCam]);
+
+  const onThumbContext = (e, id, preset, bucket) => {
+    const liveCam = Number(liveCamera) || 0;
+    const isArmed = activeByCam[preset.camera] === id;
+    const isQueue = bucket && bucket.key === 'queue';
+    // Trigger a thumb refresh for this preset so the card picks up the new snapshot.
+    const bumpThumb = () => setRefreshMap(m => ({ ...m, [id]: Date.now() }));
+
+    const items = [
+      {
+        label: 'Save Live',
+        disabled: !liveCam,
+        onClick: () => {
+          PRESET_ACTIONS.savePosition({ ...preset, camera: String(liveCam) }, liveCam);
+          setTimeout(bumpThumb, 1500);
+        },
+      },
+      { separator: true },
+      { label: 'Save Camera Back',  onClick: () => { PRESET_ACTIONS.savePosition(preset, 1); setTimeout(bumpThumb, 1500); } },
+      { label: 'Save Camera Left',  onClick: () => { PRESET_ACTIONS.savePosition(preset, 2); setTimeout(bumpThumb, 1500); } },
+      { label: 'Save Camera Right', onClick: () => { PRESET_ACTIONS.savePosition(preset, 3); setTimeout(bumpThumb, 1500); } },
+      { separator: true },
+      {
+        label: 'Rename',
+        onClick: () => {
+          const next = window.prompt('Rename preset', preset.label || '');
+          if (next && next !== preset.label) PRESET_ACTIONS.rename(preset, next);
+        },
+      },
+      {
+        label: 'Set Timeout',
+        disabled: !isQueue,
+        onClick: () => {
+          const v = window.prompt('Timeout in seconds (5–60)', String(preset.timeout || 10));
+          const n = Number(v);
+          if (Number.isFinite(n) && n >= 5 && n <= 60) PRESET_ACTIONS.setTimeout(preset, n);
+        },
+      },
+      { separator: true },
+      { label: 'Restore Default', onClick: () => { PRESET_ACTIONS.restoreDefault(preset).then(bumpThumb); } },
+      {
+        label: 'Save as Default',
+        disabled: !admin || !isArmed,
+        onClick: () => PRESET_ACTIONS.savePosition(preset, Number(preset.camera), { admin: true }),
+      },
+    ];
+    menu.open(e, items);
+  };
 
   const onThumbClick = (id, preset) => {
     const cam = String(preset.camera);
@@ -235,6 +406,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, queueRu
           motionByCam={motionByCam}
           refreshMap={refreshMap}
           onThumbClick={onThumbClick}
+          onThumbContext={onThumbContext}
         />
       ))}
       <AutoQueueColumn
@@ -244,6 +416,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, queueRu
         liveIdx={queueIdx}
         advance={advanceQueue}
       />
+      <ContextMenu state={menu.state} onClose={menu.close} />
     </div>
   );
 }

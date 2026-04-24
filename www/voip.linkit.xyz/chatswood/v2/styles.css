@@ -485,5 +485,43 @@ em { font-style: normal; }
 .activity-msg { color: var(--text); }
 .activity-detail { color: var(--text-3); font-style: normal; font-family: var(--font-mono); font-size: 10.5px; }
 
+/* ---------- CONTEXT MENU ---------- */
+.ctxmenu {
+  position: fixed;
+  z-index: 200;
+  min-width: 220px;
+  background: var(--surf-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+  padding: 4px;
+  display: flex; flex-direction: column; gap: 1px;
+  font-size: 12px;
+}
+.ctxmenu-item {
+  display: grid; grid-template-columns: 18px 1fr; gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.ctxmenu-item:hover:not(.disabled) { background: var(--surf-3); }
+.ctxmenu-item.disabled { color: var(--text-4); cursor: not-allowed; }
+.ctxmenu-item[disabled] { pointer-events: none; }
+.ctxmenu-icon { width: 18px; text-align: center; color: var(--text-3); font-family: var(--font-mono); }
+.ctxmenu-label { color: inherit; }
+.ctxmenu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
+/* ---------- ADMIN TOGGLE ---------- */
+.op-toggle { all: unset; cursor: pointer; width: 100%; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); font-family: var(--font-mono); padding: 2px 0; }
+.op-toggle:hover { color: var(--text); }
+.op-toggle.admin { color: var(--warn); }
+.dot-warn { background: var(--warn); box-shadow: 0 0 8px rgba(245,158,11,0.6); }
+
 /* Tweaks panel positioning */
 #tweaks-panel-root { font-family: var(--font-ui); }

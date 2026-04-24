@@ -32,6 +32,9 @@ function App() {
   const [cueIdx, setCueIdx] = useState(0);
   const [showLegend, setShowLegend] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  // Keep window.LS_CONFIG.admin in sync so plain-JS action helpers can check it.
+  useEffect(() => { if (window.LS_CONFIG) window.LS_CONFIG.admin = admin; }, [admin]);
 
   const advanceQueue = () => setQueueIdx(i => (i + 1) % 8);
 
@@ -112,7 +115,7 @@ function App() {
 
   return (
     <div className="app">
-      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} />
+      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} />
       <TopBar
         cueIdx={cueIdx}
         setCueIdx={setCueIdx}
@@ -127,6 +130,7 @@ function App() {
           setLive={setLive}
           liveCamera={liveCamera}
           setLiveCamFromNumber={setLiveCamFromNumber}
+          admin={admin}
           queueRunning={queueRunning}
           setQueueRunning={setQueueRunning}
           queueIdx={queueIdx}

@@ -12,7 +12,7 @@ function smartDevice(device, state) {
 const DEVICE_LABEL = { SPOTS: 'Spots', STAGE: 'Stage', FRONT: 'Front', LG_LEFT: 'TV Left', LG_RIGHT: 'TV Right' };
 const AUDIO_LABEL  = { church: 'Church Mix', video: 'Video Mix', backup: 'Video Mix (Backup)' };
 
-function LeftRail({ state, setState, onEmergency }) {
+function LeftRail({ state, setState, onEmergency, admin, setAdmin }) {
   const toggleDevice = (key, device) => {
     const next = !state[key];
     setState(s => ({ ...s, [key]: next }));
@@ -93,7 +93,20 @@ function LeftRail({ state, setState, onEmergency }) {
       </Section>
 
       <div className="rail-foot">
-        <div className="rail-foot-row"><span className="dot dot-green" /> Operator · {window.LS_CONFIG?.user || 'guest'}</div>
+        <button
+          type="button"
+          className={"rail-foot-row op-toggle" + (admin ? " admin" : "")}
+          onClick={(e) => {
+            if (!e.ctrlKey) return;
+            const next = !admin;
+            setAdmin && setAdmin(next);
+            window.Log?.add('system', `Admin mode ${next ? 'enabled' : 'disabled'}`);
+          }}
+          title="Ctrl+click to toggle admin mode"
+        >
+          <span className={"dot " + (admin ? "dot-warn" : "dot-green")} />
+          Operator · {window.LS_CONFIG?.user || 'guest'}{admin ? ' · ADMIN' : ''}
+        </button>
         <div className="rail-foot-row muted">chatswood2 · prototype</div>
       </div>
     </aside>
