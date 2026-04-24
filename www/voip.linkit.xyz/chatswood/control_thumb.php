@@ -228,6 +228,25 @@
     ));
     echo $json;
   }
+  elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
+  {
+    // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=focus_auto&camera=1
+    $cam = $_GET['camera'];
+    if (!is_numeric($cam)) die;
+
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) die;
+
+    header('Content-Type: application/json');
+    $json = shell_exec(sprintf(
+      "python3.9 %s --ip=%s --port=%s --cmd=%s 2>&1",
+      escapeshellarg(__dir__."/python/cam_control.py"),
+      escapeshellarg($visca[0]),
+      escapeshellarg((string)$visca[1]),
+      escapeshellarg($_GET['cmd'])
+    ));
+    echo $json;
+  }
   elseif ($_GET['cmd'] == 'preset_speed')
   {
     //1..24

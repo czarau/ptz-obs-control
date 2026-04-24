@@ -174,7 +174,7 @@ response = '';
 if args.cmd == 'goto':
     #print("Sending To Preset 100...")
     cam.recall_preset(int(args.val))
-    
+
 if args.cmd == 'preset_speed':
     #print("Sending To Preset 100...")
     response = cam.set_preset_speed(int(args.val))

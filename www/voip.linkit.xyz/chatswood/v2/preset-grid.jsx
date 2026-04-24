@@ -83,6 +83,7 @@ function ThumbCard({ preset, onAir, selected, inMotion, refreshTs, compact, onCl
       <div className="thumb-img">
         <Thumb presetId={preset.presetId} camera={preset.camera} fresh={!!refreshTs} ts={refreshTs} />
         {onAir && <span className="thumb-livebadge">LIVE</span>}
+        {selected && !onAir && <span className="thumb-cuebadge">CUE</span>}
         {queueBadge != null && <span className="thumb-timer">{queueBadge}s</span>}
       </div>
       <div className="thumb-meta">
