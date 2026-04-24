@@ -546,6 +546,21 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
   useEffectPG(() => { queueLiveIdxRef.current = queueLiveIdx; }, [queueLiveIdx]);
   useEffectPG(() => { queueTimerRef.current = queueTimer; }, [queueTimer]);
 
+  // Break detector: when the queue takes a scene live, it "claims" that
+  // cam id in queueClaimCamIdRef right before triggering the take, so
+  // the ls:scene-live listener can distinguish queue-owned takes from
+  // operator takeovers. Similarly for the pre-roll arm (queuePreRollIdRef).
+  //
+  // queueRunningRef exposes queueRunning to the ls:scene-live listener
+  // which is installed in a useEffect([]) and can't read props directly
+  // from its closure (mount-time value would be stale).
+  const CAM_NUM_TO_ID_PG = { 1: 'back', 2: 'left', 3: 'right', 0: 'data' };
+  const queueClaimCamIdRef = useRefPG(null);
+  const queuePreRollIdRef = useRefPG(null);    // expected "queue-<slot>" on the pre-roll camera
+  const queuePreRollCamRef = useRefPG(null);    // string cam number the pre-roll lives on
+  const queueRunningRef = useRefPG(false);
+  useEffectPG(() => { queueRunningRef.current = queueRunning; }, [queueRunning]);
+
   const takeQueueItem = (qIdx) => {
     const slot = QUEUE_SLOTS[qIdx];
     if (slot == null) return;
@@ -553,11 +568,22 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     const id = `queue-${slot}`;
     const cam = String(preset.camera);
 
+    // Claim the scene take BEFORE firing it — the ls:scene-live listener
+    // reads this ref synchronously when the event fires and clears it
+    // when the claim matches. No claim = operator takeover.
+    queueClaimCamIdRef.current = CAM_NUM_TO_ID_PG[Number(preset.camera)] || null;
+
     // Take live on this slot's camera. Routes through the ping-pong
     // helper so the outgoing scene becomes the next cue (operator can
     // flip back to the previous shot in one click).
     takeLive(preset);
     if (onTakeSceneLiveFromNumber) onTakeSceneLiveFromNumber(Number(preset.camera));
+    // onTakeSceneLive dispatches ls:scene-live synchronously — the
+    // listener runs inside that call and clears the claim on a match.
+    // If App's early-return hit (scene was already live), no event
+    // fired and the claim is still set; clearing here prevents a later
+    // unrelated take from spuriously matching the stale value.
+    queueClaimCamIdRef.current = null;
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setQueueLiveIdx(qIdx);
     const t = Number(preset.timeout) || 10;
@@ -572,6 +598,11 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     const nextId = `queue-${nextSlot}`;
     const nextCam = String(nextPreset.camera);
     if (nextCam && nextCam !== cam) {
+      // Record the pre-roll claim so the thumb-arm break detector
+      // knows this is the expected armed thumb for nextCam and won't
+      // mistake it for an operator steal.
+      queuePreRollIdRef.current = nextId;
+      queuePreRollCamRef.current = nextCam;
       moveCamera(nextPreset);
       setActiveByCam(m => ({ ...m, [nextCam]: nextId }));
       setMotionByCam(m => ({ ...m, [nextCam]: nextId }));
@@ -592,6 +623,10 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
             .catch(() => {});
         });
       });
+    } else {
+      // No pre-roll this tick (same camera). Clear any prior claim.
+      queuePreRollIdRef.current = null;
+      queuePreRollCamRef.current = null;
     }
 
     window.Log?.add('live', `Queue · take #${qIdx + 1}`, `${preset.label} · ${t}s`);
@@ -624,8 +659,15 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
   }, [queueRunning]);
 
   // When the queue is turned on, kick off the first take (unless we're
-  // resuming a paused mid-item countdown).
+  // resuming a paused mid-item countdown). Always reset the break-
+  // detector claims on transition — a stale claim from a prior run
+  // could cause the listener to either miss a real takeover (false
+  // match) or pause immediately on resume (if a ref still points at
+  // the wrong cam).
   useEffectPG(() => {
+    queueClaimCamIdRef.current = null;
+    queuePreRollIdRef.current = null;
+    queuePreRollCamRef.current = null;
     if (queueRunning && queueTimerRef.current === 0) {
       takeQueueItem(queueLiveIdxRef.current);
     }
@@ -685,6 +727,15 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       snapshotActiveOnCam(cam);
       setActiveByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
       setMotionByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
+      // Break detection — jogging the pre-roll camera breaks the
+      // queue's planned next shot. Pause so the next tick doesn't
+      // drive the camera off the operator's manual framing.
+      if (queueRunningRef.current && cam === queuePreRollCamRef.current) {
+        setQueueRunning(false);
+        window.Log?.add('live', 'Auto-queue paused', `pre-roll Cam ${cam} jogged manually`);
+        queuePreRollIdRef.current = null;
+        queuePreRollCamRef.current = null;
+      }
     };
     // Live-feed "Update" sweep dispatches this per preset as it arrives.
     // Snapshot the camera's current view into thumbs/{presetId}.jpg, then
@@ -729,13 +780,35 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       const thumbId = `${bucket.key}-${slot}`;
       setActiveByCam(m => ({ ...m, [cam]: thumbId }));
     };
+    // Scene-take break detector. Fires on every scene take (queue's own,
+    // feed click, preset take, external OBS change). If the take matches
+    // the queue's pending claim, it's queue-owned — clear the claim and
+    // carry on. Otherwise, if the queue is running, the operator has
+    // taken over; pause.
+    const onSceneLive = (e) => {
+      const newId = e.detail?.id;
+      if (!newId) return;
+      if (queueClaimCamIdRef.current === newId) {
+        queueClaimCamIdRef.current = null;
+        return;
+      }
+      if (queueRunningRef.current) {
+        setQueueRunning(false);
+        window.Log?.add('live', 'Auto-queue paused', `${newId.toUpperCase()} took live outside queue`);
+        queueClaimCamIdRef.current = null;
+        queuePreRollIdRef.current = null;
+        queuePreRollCamRef.current = null;
+      }
+    };
     window.addEventListener('ptz:manual-move', onManualMove);
     window.addEventListener('preset:refresh', onPresetRefresh);
     window.addEventListener('preset:updating', onPresetUpdating);
+    window.addEventListener('ls:scene-live', onSceneLive);
     return () => {
       window.removeEventListener('ptz:manual-move', onManualMove);
       window.removeEventListener('preset:refresh', onPresetRefresh);
       window.removeEventListener('preset:updating', onPresetUpdating);
+      window.removeEventListener('ls:scene-live', onSceneLive);
     };
   }, []);
 
@@ -930,6 +1003,19 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     // Cueing a thumb also cues the scene for its camera — "only one cue'd
     // scene at once" is enforced by the single-slot cuedSceneId in App.
     setCuedSceneFromNumber && setCuedSceneFromNumber(preset.camera);
+
+    // Break detection — if the queue was running and the operator just
+    // armed a thumb on the pre-roll camera that ISN'T the pre-roll one,
+    // the queue's planned next shot is gone. Pause so the next tick
+    // doesn't clobber the operator's cue.
+    if (queueRunningRef.current
+        && cam === queuePreRollCamRef.current
+        && id !== queuePreRollIdRef.current) {
+      setQueueRunning(false);
+      window.Log?.add('live', 'Auto-queue paused', `pre-roll on Cam ${cam} re-armed to ${id}`);
+      queuePreRollIdRef.current = null;
+      queuePreRollCamRef.current = null;
+    }
 
     // Wait for the camera to actually arrive before touching motion marker /
     // thumb / log. `settle()` polls VISCA every ~250 ms until two consecutive

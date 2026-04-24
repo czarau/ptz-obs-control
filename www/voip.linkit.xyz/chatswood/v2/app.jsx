@@ -57,6 +57,12 @@ function App() {
   // ping-pongs back — user's requested "leave the last live scene as
   // queued when switching" behaviour. Emergency is never cued (recovering
   // from it is a different action) and we never cue the one we just took.
+  //
+  // Dispatches `ls:scene-live` with the new id so listeners (the
+  // auto-queue's break-detector, anything else interested in
+  // take-regardless-of-source) can react without each path having to
+  // call multiple callbacks. Event-driven rather than state-reactive so
+  // it doesn't fire inside a React commit with stale state.
   const onTakeSceneLive = (newId) => {
     if (!newId) return;
     const outgoing = liveCamIdRef.current;
@@ -67,6 +73,7 @@ function App() {
     } else {
       setCuedSceneId(null);
     }
+    window.dispatchEvent(new CustomEvent('ls:scene-live', { detail: { id: newId } }));
   };
 
   // Convenience for child components that only have a camera number.
