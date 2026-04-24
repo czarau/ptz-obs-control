@@ -11,6 +11,21 @@
     else
       return '10.241.57.201';
   }
+
+  // VISCA-over-TCP on port 5678 of each camera. Cameras are on the local
+  // 192.168.0.0/24 subnet that srv-syd05 is also on (nginx config proxies
+  // 192.168.0.201..203 on :80 via listen ports 8806..8808). The old PHP
+  // here pointed at 10.241.57.20X which wasn't reachable — hence the
+  // "No route to host" errors before.
+  function GetCameraVISCA($cam)
+  {
+    switch ((int)$cam) {
+      case 1: return ['192.168.0.201', 5678];
+      case 2: return ['192.168.0.202', 5678];
+      case 3: return ['192.168.0.203', 5678];
+    }
+    return null;
+  }
   
   function GetCameraURL($cam)
   { 
@@ -176,17 +191,20 @@
       die;
 
     header('Content-Type: application/json');
-    $ip = GetCameraIP($cam);
-    $raw = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip)." 2>&1");
-    $trimmed = trim($raw);
-
-    // If the Python command produced real JSON, pass it through unchanged.
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) { echo json_encode(['error' => 'unknown camera']); die; }
+    $cmd = sprintf(
+      "python3.9 %s --ip=%s --port=%s 2>&1",
+      escapeshellarg(__dir__."/python/cam_control.py"),
+      escapeshellarg($visca[0]),
+      escapeshellarg((string)$visca[1])
+    );
+    $raw = shell_exec($cmd);
+    $trimmed = trim($raw ?? '');
     $probe = json_decode($trimmed, true);
     if ($probe !== null) {
       echo $trimmed;
     } else {
-      // Otherwise surface whatever stderr/stdout came back so the caller can
-      // diagnose (python missing, VISCA timeout, etc).
       echo json_encode(['error' => 'cam_control.py failed', 'stderr' => $trimmed]);
     }
   }
@@ -199,8 +217,15 @@
     if (!is_numeric($cam) || !is_numeric($val))
       die;
 
-    $ip = GetCameraIP($cam);
-    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip)." --cmd=goto --val=".escapeshellarg($val));
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) die;
+    $json = shell_exec(sprintf(
+      "python3.9 %s --ip=%s --port=%s --cmd=goto --val=%s",
+      escapeshellarg(__dir__."/python/cam_control.py"),
+      escapeshellarg($visca[0]),
+      escapeshellarg((string)$visca[1]),
+      escapeshellarg($val)
+    ));
     echo $json;
   }
   elseif ($_GET['cmd'] == 'preset_speed')
@@ -213,8 +238,15 @@
     if (!is_numeric($cam) || !is_numeric($val))
       die;
 
-    $ip = GetCameraIP($cam);
-    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip)." --cmd=goto --val=".escapeshellarg($val));
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) die;
+    $json = shell_exec(sprintf(
+      "python3.9 %s --ip=%s --port=%s --cmd=preset_speed --val=%s",
+      escapeshellarg(__dir__."/python/cam_control.py"),
+      escapeshellarg($visca[0]),
+      escapeshellarg((string)$visca[1]),
+      escapeshellarg($val)
+    ));
     echo $json;
   }     
   

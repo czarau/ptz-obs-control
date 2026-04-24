@@ -152,9 +152,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--ip", required=True)
 parser.add_argument("-c", "--cmd", required=False)
 parser.add_argument("-p", "--val", required=False)
+parser.add_argument("-P", "--port", required=False, type=int, default=5678)
 args = parser.parse_args()
 
-cam = CameraPTZOptics(args.ip, 5678)
+cam = CameraPTZOptics(args.ip, args.port)
 
 response = '';
 

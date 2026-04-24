@@ -22,7 +22,10 @@
       "Bash(curl -sk -w \"\\\\ndone: size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=init\" --max-time 30)",
       "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)",
       "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8807/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)",
-      "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8808/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)"
+      "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8808/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)",
+      "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=1\")",
+      "Bash(php -l www/voip.linkit.xyz/chatswood/control_thumb.php)",
+      "Bash(py -c \"import ast; ast.parse\\(open\\('D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/python/cam_control.py'\\).read\\(\\)\\); print\\('Python OK'\\)\")"
     ]
   }
 }
