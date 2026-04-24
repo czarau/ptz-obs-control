@@ -849,14 +849,15 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     await snapshotActiveOnCam(cam);
 
     // First click → send the camera to this preset
+    const moveStart = performance.now();
     moveCamera(preset);
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setMotionByCam(m => ({ ...m, [cam]: id }));
 
     // Wait for the camera to actually arrive before touching motion marker /
-    // thumb / log. `settle()` polls VISCA ~600 ms apart until two consecutive
-    // reads match, or 8 s max. Much tighter than the old fixed 5 s timeout —
-    // small pans clear in ~1 s, slow focus pulls get the extra headroom.
+    // thumb / log. `settle()` polls VISCA every ~250 ms until two consecutive
+    // reads match, or 5 s max. Much tighter than the old fixed 5 s timeout —
+    // small pans clear in ~0.5 s, slow focus pulls get headroom up to the cap.
     //
     // Staleness guard: if the user clicked another thumb on the same camera
     // (or jogged PTZ) before we arrived, bail — the newer action owns the
@@ -864,6 +865,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     window.PTZState?.settle(preset.camera).then(pos => {
       if (activeByCamRef.current[cam] !== id) return; // superseded
 
+      const elapsedMs = Math.round(performance.now() - moveStart);
       setMotionByCam(m => (m[cam] === id ? { ...m, [cam]: null } : m));
 
       // Pull a fresh snapshot of the now-stationary view. WebRTC frame first
@@ -882,15 +884,18 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
           .catch(() => {});
       });
 
-      // Log the settled coordinates.
+      // Log the settled coordinates + total elapsed wall time from click to
+      // settle() resolving. Lets us eyeball whether a slow "Arrived" is the
+      // camera itself (big pan, long focus pull) vs. the settle loop (too
+      // many polls, too slow an interval, network round-trip overhead).
       if (pos) {
         window.Log?.add(
           'camera',
           `Arrived · Cam ${preset.camera} · ${preset.label}`,
-          `p=${pos.pan} t=${pos.tilt} z=${pos.zoom} f=${pos.focus}`
+          `${elapsedMs}ms · p=${pos.pan} t=${pos.tilt} z=${pos.zoom} f=${pos.focus}`
         );
       } else {
-        window.Log?.add('camera', `Arrived · Cam ${preset.camera} · ${preset.label}`);
+        window.Log?.add('camera', `Arrived · Cam ${preset.camera} · ${preset.label}`, `${elapsedMs}ms`);
       }
     });
   };

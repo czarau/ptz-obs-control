@@ -76,9 +76,15 @@
   // Poll until the camera stops moving: query pos, wait, query again, compare.
   // Resolves with the final settled position (or the last sample if we hit the
   // timeout first). Resolves to null if the first query fails.
+  //
+  // Interval was 600 ms; dropped to 250 ms once goto_abs started blocking on
+  // VISCA COMPLETE (camera has physically arrived by the time goto_abs
+  // returns), so the first settle query usually already reads a stable
+  // value. Minimum detection is now ~one interval + two query round-trips,
+  // ≈ 500–700 ms total from the fetch resolving.
   function settle(cam, opts) {
-    const interval = (opts && opts.interval) || 600;
-    const maxWait  = (opts && opts.maxWait)  || 8000;
+    const interval = (opts && opts.interval) || 250;
+    const maxWait  = (opts && opts.maxWait)  || 5000;
     const start = Date.now();
     let last = null;
 
