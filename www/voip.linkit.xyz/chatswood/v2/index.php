@@ -76,6 +76,7 @@
 
   <script src="activity-log.js"></script>
   <script src="obs-client.js"></script>
+  <script src="obs-meters.js"></script>
   <script src="ptz-state.js"></script>
   <script type="text/babel" src="thumbs.jsx"></script>
   <script type="text/babel" src="context-menu.jsx"></script>

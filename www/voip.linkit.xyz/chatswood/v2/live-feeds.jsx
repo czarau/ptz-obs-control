@@ -406,15 +406,61 @@ function DataControls() {
   );
 }
 
+// Display-label → OBS input name (matches the three sources the audio-source
+// radio in the left rail switches between). MASTER is a computed "max of
+// all three" — OBS has no single program-audio bus.
+const METER_SOURCES = {
+  'CHURCH MIX': 'Audio - Church Mix (Main)',
+  'VIDEO MIX':  'Audio - Video Mix (Aux 5)',
+  'BACKUP':     'Audio - Video Mix (Aux 5 Analogue)',
+};
+
 function OverlayDock({ overlays, setOverlays, onTake }) {
+  // Subscribe once for the whole dock; each <Meter> below reads the latest
+  // value out of window.OBSMeters at every re-render.
+  const [, setMeterTick] = useStateLF(0);
+  useEffectLF(() => {
+    if (!window.OBSMeters) return;
+    return window.OBSMeters.subscribe(() => setMeterTick(t => t + 1));
+  }, []);
+
+  // Track which audio source is currently the program audio so the ACTIVE
+  // badge can shift between the three source rows.
+  const [activeAudio, setActiveAudio] = useStateLF(null);
+  useEffectLF(() => {
+    if (!window.OBS) return;
+    let alive = true;
+    const sync = () => {
+      window.OBS.currentAudio()
+        .then(k => { if (alive) setActiveAudio(k); })
+        .catch(() => {});
+    };
+    sync();
+    const id = setInterval(sync, 5000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const lvl = (label) => (window.OBSMeters?.get(METER_SOURCES[label])) || null;
+  const lChurch = lvl('CHURCH MIX');
+  const lVideo  = lvl('VIDEO MIX');
+  const lBackup = lvl('BACKUP');
+  // MASTER = max of the three (both instantaneous and held peaks).
+  const masterLevel = {
+    mag:      Math.max(lChurch?.mag      || 0, lVideo?.mag      || 0, lBackup?.mag      || 0),
+    peak:     Math.max(lChurch?.peak     || 0, lVideo?.peak     || 0, lBackup?.peak     || 0),
+    heldPeak: Math.max(lChurch?.heldPeak || 0, lVideo?.heldPeak || 0, lBackup?.heldPeak || 0),
+  };
+
+  const activeLabelFor = { church: 'CHURCH MIX', video: 'VIDEO MIX', backup: 'BACKUP' }[activeAudio];
+
   return (
     <div className="dock">
       <div className="dock-sec">
         <div className="dock-head">Output Meters</div>
-        <Meter label="CHURCH MIX" value={0.62} active />
-        <Meter label="VIDEO MIX"  value={0.48} />
-        <Meter label="BACKUP"     value={0.08} muted />
-        <Meter label="MASTER"     value={0.71} master />
+        <Meter label="CHURCH MIX" level={lChurch}       active={activeLabelFor === 'CHURCH MIX'} />
+        <Meter label="VIDEO MIX"  level={lVideo}        active={activeLabelFor === 'VIDEO MIX'} />
+        <Meter label="BACKUP"     level={lBackup}       active={activeLabelFor === 'BACKUP'} muted={!lBackup} />
+        <Meter label="MASTER"     level={masterLevel}   master />
       </div>
 
       <div className="dock-sec">
@@ -436,9 +482,26 @@ function OverlayDock({ overlays, setOverlays, onTake }) {
   );
 }
 
-function Meter({ label, value, active, muted, master }) {
-  const pct = Math.min(1, value);
+// Convert linear magnitude (0..1) to dB (-60..0). 0 → -60 (silence floor).
+function magToDb(v) {
+  if (!v || v <= 0) return -60;
+  const db = 20 * Math.log10(v);
+  return Math.max(-60, Math.min(0, db));
+}
+// Map dB (-60..0) to bar fill (0..1). -60 silence, 0 full scale.
+const dbToPct = (db) => Math.max(0, Math.min(1, (db + 60) / 60));
+
+function Meter({ label, level, active, muted, master }) {
+  const mag      = level?.mag      || 0;
+  const heldPeak = level?.heldPeak || level?.peak || 0;
+
+  const magDb      = magToDb(mag);
+  const heldPeakDb = magToDb(heldPeak);
+  const magPct     = dbToPct(magDb);
+  const heldPct    = dbToPct(heldPeakDb);
+
   const segs = 24;
+
   return (
     <div className={"meter" + (muted ? " muted" : "") + (master ? " master" : "")}>
       <div className="meter-label">
@@ -447,12 +510,16 @@ function Meter({ label, value, active, muted, master }) {
       </div>
       <div className="meter-bar">
         {Array.from({length: segs}).map((_, i) => {
-          const on = i / segs < pct;
-          const tone = i / segs < 0.6 ? "g" : i / segs < 0.85 ? "y" : "r";
-          return <span key={i} className={`seg seg-${tone}` + (on ? " on" : "")}/>;
+          const segFrac = i / segs;
+          // Broadcast-convention tone thresholds: green to -18 dB, yellow
+          // -18 to -6, red above -6. (-18 dB ≈ 70% on a 60dB range.)
+          const on = segFrac < magPct;
+          const atPeak = !on && Math.abs(segFrac - heldPct) < 1 / segs;
+          const tone = segFrac < 0.70 ? "g" : segFrac < 0.90 ? "y" : "r";
+          return <span key={i} className={`seg seg-${tone}` + (on ? " on" : "") + (atPeak ? " peak" : "")}/>;
         })}
       </div>
-      <div className="meter-num">{Math.round(-60 + pct * 60)} dB</div>
+      <div className="meter-num">{mag > 0 ? `${magDb.toFixed(0)} dB` : '-∞ dB'}</div>
     </div>
   );
 }

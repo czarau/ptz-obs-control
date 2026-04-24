@@ -398,10 +398,15 @@ em { font-style: normal; }
 .meter-label { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 9.5px; color: var(--text-2); letter-spacing: 0.04em; }
 .meter-badge { font-size: 8.5px; color: var(--live); background: var(--live-dim); padding: 0 4px; border-radius: 2px; letter-spacing: 0.08em; }
 .meter-bar { display: flex; gap: 1px; height: 8px; }
-.seg { flex: 1; background: var(--surf-3); border-radius: 1px; }
+.seg { flex: 1; background: var(--surf-3); border-radius: 1px; transition: background 60ms linear; }
 .seg.on.seg-g { background: var(--live); }
 .seg.on.seg-y { background: var(--warn); }
 .seg.on.seg-r { background: var(--danger); }
+/* Held-peak marker: a dim segment at the peak-hold position even if the
+ * live level has dropped below it. Tone follows the segment's own zone. */
+.seg.peak.seg-g { background: rgba(34,197,94,0.55); }
+.seg.peak.seg-y { background: rgba(245,158,11,0.6); }
+.seg.peak.seg-r { background: rgba(239,68,68,0.7); }
 .meter-num { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-align: right; }
 .meter.muted .meter-label, .meter.muted .meter-num { color: var(--text-4); }
 .meter.muted .seg.on { background: var(--surf-4) !important; }
