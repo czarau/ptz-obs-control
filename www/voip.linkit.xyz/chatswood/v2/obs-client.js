@@ -29,6 +29,16 @@ const OBS = (() => {
     backup: 'Audio - Video Mix (Aux 5 Analogue)',
   };
 
+  // DP overlay sources, mutually exclusive — shown/hidden on each camera
+  // scene (Camera 1/2/3) so the selected one appears regardless of which
+  // camera is live. Matches DP_LRT_Object_Name / DP_L3RD_Object_Name in
+  // the legacy control_v2.js.
+  const OVERLAY = {
+    dp:   'DP Computer',
+    l3rd: 'NDI™ 5 Source (DP Stream L3RD)',
+  };
+  const OVERLAY_SCENES = ['Camera 1 - Back', 'Camera 2 - Left', 'Camera 3 - Right'];
+
   return {
     switchScene(name) {
       return call('SetCurrentProgramScene', { sceneName: name });
@@ -100,7 +110,50 @@ const OBS = (() => {
       );
     },
 
-    SCENE, AUDIO,
+    // Show `which` overlay on every camera scene and hide the other.
+    // `which` = 'dp' | 'l3rd' | null (null = both off).
+    setOverlay(which) {
+      const targets = {
+        [OVERLAY.dp]:   which === 'dp',
+        [OVERLAY.l3rd]: which === 'l3rd',
+      };
+      return open().then(obs => {
+        const ops = [];
+        OVERLAY_SCENES.forEach(scene => {
+          Object.entries(targets).forEach(([source, visible]) => {
+            ops.push(
+              obs.call('GetSceneItemId', { sceneName: scene, sourceName: source })
+                .then(r => obs.call('SetSceneItemEnabled', {
+                  sceneName: scene,
+                  sceneItemId: r.sceneItemId,
+                  sceneItemEnabled: visible,
+                }))
+                .catch(() => {})
+            );
+          });
+        });
+        return Promise.all(ops);
+      });
+    },
+
+    // Probe which overlay is currently visible on the first camera scene.
+    // Returns 'dp' | 'l3rd' | null.
+    currentOverlay() {
+      return open().then(obs => {
+        const scene = OVERLAY_SCENES[0];
+        const probe = (source) =>
+          obs.call('GetSceneItemId', { sceneName: scene, sourceName: source })
+            .then(r => obs.call('GetSceneItemEnabled', {
+              sceneName: scene, sceneItemId: r.sceneItemId,
+            }))
+            .then(r => r.sceneItemEnabled)
+            .catch(() => false);
+        return Promise.all([probe(OVERLAY.dp), probe(OVERLAY.l3rd)])
+          .then(([dp, l3]) => dp ? 'dp' : (l3 ? 'l3rd' : null));
+      });
+    },
+
+    SCENE, AUDIO, OVERLAY,
   };
 })();
 

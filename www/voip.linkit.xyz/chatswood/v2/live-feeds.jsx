@@ -313,11 +313,44 @@ function Arrow({ d }) {
 }
 
 function DataControls() {
+  const [overlay, setOverlay] = useStateLF(null); // 'dp' | 'l3rd' | null
+
+  // Sync with OBS on mount + whenever we suspect it may have changed.
+  useEffectLF(() => {
+    if (!window.OBS) return;
+    let alive = true;
+    const sync = () => {
+      window.OBS.currentOverlay().then(kind => { if (alive) setOverlay(kind); }).catch(() => {});
+    };
+    sync();
+    const id = setInterval(sync, 5000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const toggle = (kind) => {
+    const next = overlay === kind ? null : kind;
+    setOverlay(next); // optimistic
+    if (window.OBS) window.OBS.setOverlay(next).catch(() => {});
+    window.Log?.add('live', next ? `Overlay → ${next === 'dp' ? 'DP' : 'Lower Third'}` : 'Overlay off');
+  };
+
   return (
     <div className="data-ctrls">
-      <button className="datbtn on"><span className="dot dot-green"/>Overlay</button>
-      <button className="datbtn">Lower Third</button>
-      <button className="datbtn">Slides</button>
+      <button
+        className={"datbtn" + (overlay === 'dp' ? " on" : "")}
+        onClick={() => toggle('dp')}
+      >
+        {overlay === 'dp' && <span className="dot dot-green"/>}
+        Overlay
+      </button>
+      <button
+        className={"datbtn" + (overlay === 'l3rd' ? " on" : "")}
+        onClick={() => toggle('l3rd')}
+      >
+        {overlay === 'l3rd' && <span className="dot dot-green"/>}
+        Lower Third
+      </button>
+      <button className="datbtn" disabled title="Not wired yet">Slides</button>
     </div>
   );
 }
