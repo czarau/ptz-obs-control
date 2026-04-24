@@ -25,8 +25,8 @@ function thumbUrl({ presetId, camera, fresh, ts }) {
   return null;
 }
 
-function Thumb({ presetId, camera, fresh, src, alt = '', className = '', style }) {
-  const url = src || thumbUrl({ presetId, camera, fresh });
+function Thumb({ presetId, camera, fresh, ts, src, alt = '', className = '', style }) {
+  const url = src || thumbUrl({ presetId, camera, fresh, ts });
   if (!url) {
     return <div className={"thumb-placeholder " + className} style={style} aria-hidden />;
   }
