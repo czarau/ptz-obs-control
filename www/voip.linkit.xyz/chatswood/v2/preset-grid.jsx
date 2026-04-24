@@ -781,14 +781,23 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       snapshotActiveOnCam(cam);
       setActiveByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
       setMotionByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
-      // Break detection — jogging the pre-roll camera breaks the
-      // queue's planned next shot. Pause so the next tick doesn't
-      // drive the camera off the operator's manual framing.
-      if (queueRunningRef.current && cam === queuePreRollCamRef.current) {
-        setQueueRunning(false);
-        window.Log?.add('live', 'Auto-queue paused', `pre-roll Cam ${cam} jogged manually`);
-        queuePreRollIdRef.current = null;
-        queuePreRollCamRef.current = null;
+      // Break detection — jogging either the pre-roll OR the currently-
+      // live queue camera is a takeover. Pre-roll: the queue's planned
+      // next shot is gone. Live cam: the on-air framing is the
+      // operator's now, not the queue's expected preset.
+      if (queueRunningRef.current) {
+        const curSlot = QUEUE_SLOTS[queueLiveIdxRef.current];
+        const curPre  = presetFor(curSlot);
+        const curCam  = String(curPre.camera);
+        if (cam === queuePreRollCamRef.current) {
+          setQueueRunning(false);
+          window.Log?.add('live', 'Auto-queue paused', `pre-roll Cam ${cam} jogged manually`);
+          queuePreRollIdRef.current = null;
+          queuePreRollCamRef.current = null;
+        } else if (cam === curCam) {
+          setQueueRunning(false);
+          window.Log?.add('live', 'Auto-queue paused', `live Cam ${cam} jogged manually`);
+        }
       }
     };
     // Live-feed "Update" sweep dispatches this per preset as it arrives.
@@ -1058,17 +1067,39 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     // scene at once" is enforced by the single-slot cuedSceneId in App.
     setCuedSceneFromNumber && setCuedSceneFromNumber(preset.camera);
 
-    // Break detection — if the queue was running and the operator just
-    // armed a thumb on the pre-roll camera that ISN'T the pre-roll one,
-    // the queue's planned next shot is gone. Pause so the next tick
-    // doesn't clobber the operator's cue.
-    if (queueRunningRef.current
-        && cam === queuePreRollCamRef.current
-        && id !== queuePreRollIdRef.current) {
-      setQueueRunning(false);
-      window.Log?.add('live', 'Auto-queue paused', `pre-roll on Cam ${cam} re-armed to ${id}`);
-      queuePreRollIdRef.current = null;
-      queuePreRollCamRef.current = null;
+    // Break detection — two flavours, both trip on first-click arming:
+    //
+    //   a. Pre-roll steal: operator armed a thumb on the pre-rolled
+    //      camera that isn't the pre-roll thumb. Queue's planned
+    //      next shot is gone.
+    //
+    //   b. Live-cam re-arm: operator armed a thumb on the queue's
+    //      CURRENTLY-LIVE camera. This is subtle because taking the
+    //      same-camera thumb doesn't fire an OBS scene change — the
+    //      ls:scene-live listener early-returns in App and never
+    //      sees the take. But first-click already moves the physical
+    //      camera to a different shot than the queue intended, so
+    //      it's a real takeover. Detect it here instead.
+    if (queueRunningRef.current) {
+      // (a) pre-roll
+      if (cam === queuePreRollCamRef.current && id !== queuePreRollIdRef.current) {
+        setQueueRunning(false);
+        window.Log?.add('live', 'Auto-queue paused', `pre-roll on Cam ${cam} re-armed to ${id}`);
+        queuePreRollIdRef.current = null;
+        queuePreRollCamRef.current = null;
+      } else {
+        // (b) live-cam — compute the queue's expected thumb on its
+        // current live camera and compare. Only fires when queue is
+        // actually running AND this click hit the live cam.
+        const curSlot = QUEUE_SLOTS[queueLiveIdxRef.current];
+        const curPre  = presetFor(curSlot);
+        const curCam  = String(curPre.camera);
+        const curId   = `queue-${curSlot}`;
+        if (cam === curCam && id !== curId) {
+          setQueueRunning(false);
+          window.Log?.add('live', 'Auto-queue paused', `live Cam ${cam} re-armed to ${id}`);
+        }
+      }
     }
 
     // Wait for the camera to actually arrive before touching motion marker /
