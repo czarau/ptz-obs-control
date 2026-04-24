@@ -230,7 +230,14 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
   );
 }
 
-function AutoQueueColumn({ items, running, setRunning, liveIdx, advance }) {
+// Find which SLOT_BUCKETS entry owns a given slot; fall back to a synthetic
+// "queue" bucket if the slot isn't mapped to a category.
+function bucketForSlot(slot) {
+  return SLOT_BUCKETS.find(b => b.slots.includes(slot))
+    || { key: 'queue', title: 'Queue', slots: [slot], cols: 1, span: 1 };
+}
+
+function AutoQueueColumn({ items, running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext }) {
   return (
     <div className="pcol pcol-queue" style={{ gridColumn: "span 2" }}>
       <div className="pcol-head pcol-head-queue">
@@ -245,16 +252,31 @@ function AutoQueueColumn({ items, running, setRunning, liveIdx, advance }) {
       </div>
       <div className="pcol-grid" data-cols="2" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
         {items.map((q, i) => {
-          const p = presetFor(q.slot);
-          p.label = q.label;
+          // Share the underlying preset slot id with the category column — so
+          // arming / going live on an auto-queue card highlights the same
+          // preset everywhere it appears. Display label overrides for the
+          // queue view only; the stored preset label is unchanged.
+          const ownerBucket = bucketForSlot(q.slot);
+          const id = `${ownerBucket.key}-${q.slot}`;
+          const underlying = presetFor(q.slot);
+          const display = { ...underlying, label: q.label };
+          const cam = String(underlying.camera);
+          const isActive = activeByCam[cam] === id;
+          const isMotion = motionByCam[cam] === id;
+          // Mark the bucket as queue so the context menu's "Set Timeout"
+          // item is enabled on these cards.
+          const ctxBucket = { ...ownerBucket, key: 'queue' };
           return (
             <ThumbCard
               key={i}
-              preset={p}
-              onAir={i === liveIdx}
-              selected={i === (liveIdx + 1) % items.length}
+              preset={display}
+              onAir={liveId === id}
+              selected={isActive && liveId !== id}
+              inMotion={isMotion}
+              refreshTs={refreshMap[id]}
               queueBadge={q.t}
-              onClick={() => {}}
+              onClick={() => onThumbClick(id, underlying)}
+              onContextMenu={(e) => onThumbContext(e, id, underlying, ctxBucket)}
             />
           );
         })}
@@ -432,8 +454,13 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         items={AUTO_QUEUE}
         running={queueRunning}
         setRunning={setQueueRunning}
-        liveIdx={queueIdx}
         advance={advanceQueue}
+        liveId={liveId}
+        activeByCam={activeByCam}
+        motionByCam={motionByCam}
+        refreshMap={refreshMap}
+        onThumbClick={onThumbClick}
+        onThumbContext={onThumbContext}
       />
       <ContextMenu state={menu.state} onClose={menu.close} />
     </div>
