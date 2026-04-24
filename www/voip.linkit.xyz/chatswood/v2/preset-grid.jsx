@@ -623,6 +623,61 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     }
   }, [queueRunning]);
 
+  // Auto-pause on operator takeover. The queue runs on two rails while
+  // live:
+  //   (a) the camera it just took live should STAY on-air until the
+  //       tick expires and the queue itself advances
+  //   (b) the pre-rolled next camera should keep its armed thumb until
+  //       the queue advances to it
+  // If either invariant is violated — operator clicks a different feed,
+  // takes a non-queue preset, or arms another preset on the pre-roll
+  // camera — the operator has clearly taken over. Pause the queue so
+  // the next tick doesn't clobber their shot. They re-arm the queue
+  // with the Running button when they're ready.
+  //
+  // Using a tiny grace window (1 tick) after takeQueueItem to let state
+  // settle — React batches the setActiveByCam / setLive from the take,
+  // but the external OBS poll that surfaces the scene change can arrive
+  // a beat later and briefly not-match.
+  const queueGraceRef = useRefPG(0);
+  useEffectPG(() => {
+    if (!queueRunning) return;
+    if (queueGraceRef.current > Date.now()) return;
+
+    const curSlot  = QUEUE_SLOTS[queueLiveIdx];
+    const curPre   = presetFor(curSlot);
+    const expLive  = Number(curPre.camera);
+
+    if (Number(liveCamera) && expLive && Number(liveCamera) !== expLive) {
+      setQueueRunning(false);
+      window.Log?.add('live', 'Auto-queue paused', `Cam ${liveCamera} went live off-queue`);
+      return;
+    }
+
+    // Pre-roll check — only meaningful when the next item is on a
+    // different camera (same-cam transitions don't pre-roll).
+    const nextIdx = (queueLiveIdx + 1) % QUEUE_SLOTS.length;
+    const nextSlot = QUEUE_SLOTS[nextIdx];
+    const nextPre  = presetFor(nextSlot);
+    const nextCam  = String(nextPre.camera);
+    if (nextCam && nextCam !== String(expLive)) {
+      const expectedId = `queue-${nextSlot}`;
+      const actual = activeByCam[nextCam];
+      if (actual && actual !== expectedId) {
+        setQueueRunning(false);
+        window.Log?.add('live', 'Auto-queue paused', `pre-roll on Cam ${nextCam} was re-armed`);
+      }
+    }
+  }, [queueRunning, queueLiveIdx, liveCamera, activeByCam]);
+
+  // Wrap takeQueueItem so every advance bumps the grace window — gives
+  // the OBS poll / render batch a moment to settle before the
+  // interrupt-detector starts comparing.
+  const GRACE_MS = 1500;
+  useEffectPG(() => {
+    queueGraceRef.current = Date.now() + GRACE_MS;
+  }, [queueLiveIdx]);
+
   // Snapshot the camera's current view into the given thumb slot. Hybrid:
   //  1. Prefer the instant WebRTC path — grab a frame from the live <video>
   //     and POST it to ?cmd=save_thumb. No camera round-trip, no await
