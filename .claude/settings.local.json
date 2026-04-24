@@ -42,7 +42,8 @@
       "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26poscall%26100\")",
       "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26posset%26100\")",
       "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26left%2612%2612\")",
-      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26ptzstop\")"
+      "Bash(curl -sk --max-time 5 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=cgi&camera=1&q=ptzcmd%26ptzstop\")",
+      "Bash(curl -sk --max-time 8 -X POST --data-binary @D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/cam_1_1.jpg \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=save_thumb&id=999\")"
     ]
   }
 }

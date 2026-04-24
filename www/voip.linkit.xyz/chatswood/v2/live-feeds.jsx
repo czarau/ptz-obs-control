@@ -111,12 +111,13 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
             .map((p, slot) => ({ p, slot }))
             .filter(x => x.p && String(x.p.camera) === String(c.camera));
           window.Log?.add('camera', `Update thumbs · Cam ${c.camera}`, `${matches.length} presets`);
-          const base = CAM_BASE[c.camera];
-          if (!base) return;
           matches.forEach((x, i) => {
             setTimeout(() => {
+              // Recall the preset through the auth-aware PHP proxy, wait
+              // for the camera to arrive, then fire the refresh event
+              // (preset-grid's handler snapshots and bumps the thumb).
               const presetId = startIndex + x.slot;
-              fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${presetId}`, { mode: 'no-cors' }).catch(() => {});
+              ptzCmd(c.camera, `poscall&${presetId}`);
               setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('preset:refresh', {
                   detail: { camera: c.camera, slot: x.slot }

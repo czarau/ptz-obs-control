@@ -429,16 +429,28 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       setMotionByCam(m => (m[cam] == null ? m : { ...m, [cam]: null }));
     };
     // Live-feed "Update" sweep dispatches this per preset as it arrives.
+    // Snapshot the camera's current view into thumbs/{presetId}.jpg, then
+    // bump the refresh map so the card reloads from the fresh cache.
     const onPresetRefresh = (e) => {
       const slot = e.detail?.slot;
-      if (slot == null) return;
-      // Find which view owns this slot — either a category bucket or the
-      // independent auto-queue range — and bump that thumb's cache-buster.
+      const cam  = e.detail?.camera;
+      if (slot == null || !cam) return;
       const bucket = SLOT_BUCKETS.find(b => b.slots.includes(slot))
         || (QUEUE_SLOTS.includes(slot) ? { key: 'queue' } : null);
       if (!bucket) return;
       const thumbId = `${bucket.key}-${slot}`;
-      setRefreshMap(m => ({ ...m, [thumbId]: Date.now() }));
+      const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + slot;
+      const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+      const bump = () => setRefreshMap(m => ({ ...m, [thumbId]: Date.now() }));
+      const web = window.capturePresetThumb
+        ? window.capturePresetThumb(Number(cam), slot)
+        : Promise.resolve(false);
+      web.then(ok => {
+        if (ok) { bump(); return; }
+        fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
+          .then(() => bump())
+          .catch(() => {});
+      });
     };
     window.addEventListener('ptz:manual-move', onManualMove);
     window.addEventListener('preset:refresh', onPresetRefresh);
@@ -550,7 +562,22 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         return { ...m, [cam]: null };
       });
       if (stillValid) {
-        setRefreshMap(m => ({ ...m, [id]: Date.now() }));
+        // Pull a fresh snapshot of the camera's NEW position (it's arrived)
+        // and write it to the cache. Bump refreshMap only after the file
+        // is on disk so the thumb reloads with the new frame, not a stale
+        // copy. Try the instant WebRTC path first, fall back to server
+        // action_snapshot if no frame is available.
+        const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+        const bump = () => setRefreshMap(m => ({ ...m, [id]: Date.now() }));
+        const web = window.capturePresetThumb
+          ? window.capturePresetThumb(Number(preset.camera), preset.slot)
+          : Promise.resolve(false);
+        web.then(ok => {
+          if (ok) { bump(); return; }
+          fetch(`${endpoint}?cmd=thumb&camera=${preset.camera}&id=${preset.presetId}&ts=${Date.now()}`)
+            .then(() => bump())
+            .catch(() => {});
+        });
       }
     }, MOTION_MS);
 

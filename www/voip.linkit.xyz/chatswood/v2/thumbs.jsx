@@ -5,20 +5,22 @@
 
 const THUMB_ENDPOINT = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
 
-// Build a cached-thumbnail URL. `presetId` is the absolute preset index
+// Build a thumbnail URL. `presetId` is the absolute preset index
 // (preset_start_index + slot), matching how control_thumb.php stores them.
-// Only appends &ts= when `ts` is explicitly provided — otherwise the URL is
-// stable and the browser caches normally (important so we don't accidentally
-// refresh every thumb on every parent re-render).
+// Preset thumbs always read from the cached file on disk (cmd=thumb_cache);
+// refreshing the cache is done separately by the JS layer (save_thumb POST
+// from WebRTC, or cmd=thumb to pull from the camera) before bumping `ts` to
+// force the browser to re-fetch. `fresh` remains in the shape only to make
+// the legacy live-feed path explicit.
 function thumbUrl({ presetId, camera, fresh, ts }) {
   const tsParam = ts != null ? `&ts=${ts}` : '';
   if (presetId != null) {
-    const cmd = fresh ? 'thumb' : 'thumb_cache';
     const cam = camera ? `&camera=${camera}` : '';
-    return `${THUMB_ENDPOINT}?cmd=${cmd}&id=${presetId}${cam}${tsParam}`;
+    return `${THUMB_ENDPOINT}?cmd=thumb_cache&id=${presetId}${cam}${tsParam}`;
   }
   if (camera != null) {
-    return `${THUMB_ENDPOINT}?cmd=thumb&camera=${camera}${tsParam}`;
+    const cmd = fresh ? 'thumb' : 'thumb_cache';
+    return `${THUMB_ENDPOINT}?cmd=${cmd}&camera=${camera}${tsParam}`;
   }
   return null;
 }
