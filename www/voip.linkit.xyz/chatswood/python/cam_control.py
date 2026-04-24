@@ -245,6 +245,13 @@ if args.cmd == 'goto_abs':
         steps.append({"axis": "zoom", "response": _jsonable(r)})
         response = r
     if args.focus is not None:
+        # VISCA 04 48 (Focus Direct) only executes in manual-focus mode. If
+        # the camera is currently in AF, the command comes back "Command
+        # Not Executable" (90 6y 41 FF). Switch to MF first so the exact
+        # captured focus value lands — if the operator wants AF afterwards
+        # they click the AUTO button which re-enables it explicitly.
+        r_mf = cam.set_focus_manual()
+        steps.append({"axis": "focus_mode", "response": _jsonable(r_mf)})
         r = cam.set_focus_position(args.focus)
         steps.append({"axis": "focus", "response": _jsonable(r)})
         response = r
