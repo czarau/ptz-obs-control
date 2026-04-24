@@ -265,8 +265,8 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
             <span className="joy-center-label">HOME</span>
           </button>
         </div>
-        {camera === 1 && <FollowFaceToggle camera={camera} />}
       </div>
+      {camera === 1 && <FollowFaceToggle camera={camera} />}
       <div className="ptzpad-controls">
         <div className="ctrl-group" onWheel={onZoomWheel}>
           <div className="ctrl-label">ZOOM</div>
