@@ -39,11 +39,30 @@ function App() {
   // can frame the next shot before taking it, fall back to live when
   // nothing is cued so basic jog still works.
   const ptzTargetCam = cuedSceneId != null ? LIVE_CAM_NUM[cuedSceneId] : liveCamera;
-  // Called by child components after they switch OBS scenes so the live-camera
-  // marker is updated immediately (without waiting for the next OBS poll).
-  const setLiveCamFromNumber = (n) => {
+  // Whether an id names a real "switchable" scene (not emergency, not null).
+  // Used to decide whether it's a valid cue target when a scene transitions.
+  const isCuableSceneId = (id) => id === 'back' || id === 'left' || id === 'right' || id === 'data';
+
+  // One helper for every "this scene just went live" transition. Updates
+  // liveCam AND cues the OUTGOING scene so the next take naturally
+  // ping-pongs back — user's requested "leave the last live scene as
+  // queued when switching" behaviour. Emergency is never cued (recovering
+  // from it is a different action) and we never cue the one we just took.
+  const onTakeSceneLive = (newId) => {
+    if (!newId) return;
+    const outgoing = liveCamId;
+    setLiveCam(newId);
+    if (outgoing && outgoing !== newId && isCuableSceneId(outgoing)) {
+      setCuedSceneId(outgoing);
+    } else {
+      setCuedSceneId(null);
+    }
+  };
+
+  // Convenience for child components that only have a camera number.
+  const onTakeSceneLiveFromNumber = (n) => {
     const id = CAM_NUM_TO_ID[n];
-    if (id) setLiveCam(id);
+    if (id) onTakeSceneLive(id);
   };
 
   // Called by PresetGrid when a thumb is armed on camera N. Syncs the
@@ -55,15 +74,15 @@ function App() {
     if (id) setCuedSceneId(id);
   };
 
-  // Take the currently cued scene to program. Switches OBS scene, updates
-  // liveCamId, and clears the cue. No-op if nothing is cued.
+  // Take the currently cued scene to program. Switches OBS scene and
+  // routes through onTakeSceneLive so the outgoing scene becomes the
+  // next cue. No-op if nothing is cued.
   const takeCuedScene = () => {
     if (!cuedSceneId) return;
     const scene = SCENE_FOR_ID[cuedSceneId];
     if (window.OBS && scene) window.OBS.switchScene(scene).catch(() => {});
-    setLiveCam(cuedSceneId);
     window.Log?.add('live', `LIVE → ${cuedSceneId.toUpperCase()}`, scene);
-    setCuedSceneId(null);
+    onTakeSceneLive(cuedSceneId);
   };
   const [queueRunning, setQueueRunning] = useState(false);
   const [queueIdx, setQueueIdx] = useState(0);
@@ -188,11 +207,11 @@ function App() {
           if (!camId || lastSceneCamRef.current === camId) return;
           lastSceneCamRef.current = camId;
           window.Log?.add('live', `Scene → ${scene}`, 'external');
-          if (camId === 'emergency') setQueueRunning(false);
-          setLiveCam(camId);
-          // Scene is now live — if it was the cued one (or any other),
-          // the cue is fulfilled / stale. Clear it.
-          setCuedSceneId(null);
+          if (camId === 'emergency') { setQueueRunning(false); setLiveCam(camId); setCuedSceneId(null); return; }
+          // Same ping-pong behaviour as in-app takes — the outgoing scene
+          // becomes the next cue, so flipping back to the previous shot is
+          // one click / key press away.
+          onTakeSceneLive(camId);
         })
         .catch(() => {});
     };
@@ -276,7 +295,7 @@ function App() {
           liveId={liveId}
           setLive={setLive}
           liveCamera={liveCamera}
-          setLiveCamFromNumber={setLiveCamFromNumber}
+          onTakeSceneLiveFromNumber={onTakeSceneLiveFromNumber}
           setCuedSceneFromNumber={setCuedSceneFromNumber}
           admin={admin}
           queueRunning={queueRunning}

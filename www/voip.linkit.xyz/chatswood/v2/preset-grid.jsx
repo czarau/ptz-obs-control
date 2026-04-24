@@ -520,7 +520,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, liveCameraNum, 
   );
 }
 
-function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, setCuedSceneFromNumber, admin, queueRunning, setQueueRunning, queueIdx, advanceQueue, showCustom }) {
+function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, setCuedSceneFromNumber, admin, queueRunning, setQueueRunning, queueIdx, advanceQueue, showCustom }) {
   // Per-camera state: each camera has at most one "at-position" preset (the
   // last one it moved to) and at most one "in-motion" preset.
   const [activeByCam, setActiveByCam] = useStatePG({});
@@ -553,9 +553,11 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, setCued
     const id = `queue-${slot}`;
     const cam = String(preset.camera);
 
-    // Take live on this slot's camera.
+    // Take live on this slot's camera. Routes through the ping-pong
+    // helper so the outgoing scene becomes the next cue (operator can
+    // flip back to the previous shot in one click).
     takeLive(preset);
-    if (setLiveCamFromNumber) setLiveCamFromNumber(Number(preset.camera));
+    if (onTakeSceneLiveFromNumber) onTakeSceneLiveFromNumber(Number(preset.camera));
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setQueueLiveIdx(qIdx);
     const t = Number(preset.timeout) || 10;
@@ -886,13 +888,12 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, setCued
   const onThumbClick = async (id, preset) => {
     const cam = String(preset.camera);
 
-    // Second click on the preset already armed on this camera → go LIVE
+    // Second click on the preset already armed on this camera → go LIVE.
+    // onTakeSceneLiveFromNumber handles both liveCam update AND the
+    // ping-pong cue (outgoing scene becomes the new cue).
     if (activeByCam[cam] === id) {
       takeLive(preset);
-      setLiveCamFromNumber && setLiveCamFromNumber(preset.camera);
-      // Take is committed — drop the scene cue (the external OBS poll
-      // would clear it soon anyway, but make it immediate).
-      setCuedSceneFromNumber && setCuedSceneFromNumber(null);
+      if (onTakeSceneLiveFromNumber) onTakeSceneLiveFromNumber(preset.camera);
       return;
     }
 

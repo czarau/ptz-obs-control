@@ -1,18 +1,39 @@
-// Thin wrapper around OBSWebSocket v5. Each call opens a fresh connection
-// (matches the pattern in ../control_v2.js). All functions return
-// Promises so the React layer can chain UI updates.
+// Thin wrapper around OBSWebSocket v5. Each call opens a fresh connection,
+// runs its command(s), and ALWAYS disconnects — previously we connected
+// but never disconnected, so every click/poll leaked a websocket and
+// OBS eventually stopped accepting new ones ("timeout after a little
+// while" in the field). Each poll cycle (scene/record/stream/stats) and
+// every user action now opens + closes cleanly.
+//
+// Also adds a 5s connect timeout so a network blip doesn't leave a
+// Promise hung forever on a dead TCP socket.
 
 const OBS = (() => {
   const addr = (window.LS_CONFIG || {}).obsAddr;
   const pwd  = (window.LS_CONFIG || {}).obsPassword;
+  const CONNECT_TIMEOUT_MS = 1000;
 
   function open() {
     const obs = new OBSWebSocket();
-    return obs.connect(addr, pwd).then(() => obs);
+    const connect = obs.connect(addr, pwd).then(() => obs);
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('OBS connect timeout')), CONNECT_TIMEOUT_MS)
+    );
+    return Promise.race([connect, timeout]);
+  }
+
+  // Run `fn(obs)` against a fresh connection and disconnect afterwards
+  // whether it resolved or rejected. All higher-level helpers funnel
+  // through here so no method can accidentally skip the disconnect.
+  function withSession(fn) {
+    return open().then(obs => {
+      const p = Promise.resolve().then(() => fn(obs));
+      return p.finally(() => { try { obs.disconnect(); } catch (_) {} });
+    });
   }
 
   function call(method, args) {
-    return open().then(obs => obs.call(method, args));
+    return withSession(obs => obs.call(method, args));
   }
 
   const SCENE = {
@@ -86,7 +107,7 @@ const OBS = (() => {
     setAudioSource(kind) {
       const wanted = AUDIO[kind];
       if (!wanted) return Promise.reject(new Error('unknown audio kind: ' + kind));
-      return open().then(obs =>
+      return withSession(obs =>
         obs.call('GetSceneList').then(list => {
           const scenes = list.scenes || [];
           const ops = [];
@@ -111,7 +132,7 @@ const OBS = (() => {
     currentAudio() {
       // Returns the KEY ('church'|'video'|'backup') of the active source in the
       // current program scene, or null.
-      return open().then(obs =>
+      return withSession(obs =>
         obs.call('GetCurrentProgramScene').then(cur => {
           const scene = cur.currentProgramSceneName;
           const entries = Object.entries(AUDIO);
@@ -134,7 +155,7 @@ const OBS = (() => {
         [OVERLAY.dp]:   which === 'dp',
         [OVERLAY.l3rd]: which === 'l3rd',
       };
-      return open().then(obs => {
+      return withSession(obs => {
         const ops = [];
         OVERLAY_SCENES.forEach(scene => {
           Object.entries(targets).forEach(([source, visible]) => {
@@ -156,7 +177,7 @@ const OBS = (() => {
     // Probe which overlay is currently visible on the first camera scene.
     // Returns 'dp' | 'l3rd' | null.
     currentOverlay() {
-      return open().then(obs => {
+      return withSession(obs => {
         const scene = OVERLAY_SCENES[0];
         const probe = (source) =>
           obs.call('GetSceneItemId', { sceneName: scene, sourceName: source })
