@@ -91,7 +91,7 @@ function focusCmd(camera, cmd) {
   window.Log?.add('camera', `Focus ${cmd.replace('focus_', '')} · Cam ${camera}`);
 }
 
-function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptzSpeed }) {
+function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeCuedScene, overlays, setOverlays, onTake, ptzSpeed }) {
   const cams = [CAM_META.back, CAM_META.left, CAM_META.right, CAM_META.data];
   const menu = useContextMenu();
 
@@ -177,6 +177,21 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
     menu.open(e, items);
   };
 
+  // Click model mirrors the preset thumbs:
+  //   - click a feed that's already on-air → no-op (already live)
+  //   - click the currently-cued feed → takes it live
+  //   - click any other feed → arms the cue on it (replaces any prior cue,
+  //     only one scene can be cued at a time)
+  const onFeedClick = (c) => {
+    if (liveCamId === c.id) return;
+    if (cuedSceneId === c.id) {
+      takeCuedScene && takeCuedScene();
+      return;
+    }
+    setCuedSceneId && setCuedSceneId(c.id);
+    window.Log?.add('live', `CUE scene → ${c.label}`, c.scene);
+  };
+
   return (
     <div className="feed-row">
       {cams.map(c => (
@@ -184,12 +199,9 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
           key={c.id}
           cam={c}
           onAir={liveCamId === c.id}
+          cued={cuedSceneId === c.id}
           ptzSpeed={ptzSpeed}
-          onClick={() => {
-            setLiveCam(c.id);
-            if (window.OBS) window.OBS.switchScene(c.scene).catch(() => {});
-            window.Log?.add('live', `LIVE feed → ${c.label}`, c.scene);
-          }}
+          onClick={() => onFeedClick(c)}
           onContextMenu={(e) => openFeedContext(e, c)}
         />
       ))}
@@ -201,7 +213,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
 
 const { useState: useStateLF, useEffect: useEffectLF, useRef: useRefLF } = React;
 
-function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
+function LiveFeed({ cam, onAir, cued, onClick, onContextMenu, ptzSpeed }) {
   const videoRef = useRefLF(null);
 
   // Spin up a WebRTC peer connection when the element mounts, tear it down on unmount.
@@ -237,18 +249,19 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
 
   return (
     <div
-      className={"feed" + (onAir ? " feed-onair" : "")}
+      className={"feed" + (onAir ? " feed-onair" : "") + (cued && !onAir ? " feed-cue" : "")}
       onContextMenu={onContextMenu}
     >
       <div className="feed-head">
         <span className="feed-head-left">
           {cam.camera > 0 && (
-            <span className={"thumb-num" + (onAir ? " num-live" : "")}>{cam.camera}</span>
+            <span className={"thumb-num" + (onAir ? " num-live" : "") + (cued && !onAir ? " num-cue" : "")}>{cam.camera}</span>
           )}
           <span className="feed-title">{cam.label}</span>
         </span>
         {onAir && <span className="feed-live"><span/>LIVE</span>}
-        {!onAir && <span className="feed-hint">{cam.hint}</span>}
+        {cued && !onAir && <span className="feed-cuebadge">CUE</span>}
+        {!onAir && !cued && <span className="feed-hint">{cam.hint}</span>}
       </div>
       {/* draggable on feed-img only so ptzpad arrows / zoom / focus buttons
        *  below remain interactive (mousedown there would otherwise start a

@@ -64,12 +64,17 @@ function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend, showActivity, se
 }
 
 function ShortcutLegend({ onClose }) {
-  // Operational shortcuts (audio / lights / cameras / presets / broadcast)
-  // were removed to prevent misfires during live services. Only PTZ jog
-  // remains — everything else is driven from the on-screen buttons.
+  // Deliberately minimal. Operational shortcuts (audio / lights / record /
+  // stream / emergency / presets) are button-only to prevent live-service
+  // misfires. The scene-cue flow is the only operational keyboard path.
   const groups = [
+    { title: "Scene cue", items: [
+      ["1 – 4", "Cue Back / Left / Right / Data"],
+      ["Same key again", "Take cued scene live"],
+      ["Space", "Take cued scene live"],
+    ]},
     { title: "PTZ", items: [
-      ["Arrow keys", "Pan / tilt active camera"],
+      ["Arrow keys", "Pan / tilt (cued camera, or live if none)"],
       ["+ / −", "Zoom in / out"],
       ["Shift + Arrow", "Fine adjust"],
     ]},

@@ -12,8 +12,20 @@ function App() {
 
   const [liveId, setLive] = useState(null);
   const [liveCamId, setLiveCam] = useState("back");
+  // cuedSceneId follows the same CUE → LIVE two-click model the preset
+  // thumbs use. 'back' | 'left' | 'right' | 'data' | null. Only one scene
+  // can be cued at any moment. Cueing is cleared when a take happens, on
+  // emergency, or when an external OBS scene change is picked up by the
+  // poll.
+  const [cuedSceneId, setCuedSceneId] = useState(null);
   const LIVE_CAM_NUM = { back: 1, left: 2, right: 3, data: 0 };
   const CAM_NUM_TO_ID = { 1: "back", 2: "left", 3: "right", 0: "data" };
+  const SCENE_FOR_ID = {
+    back:  'Camera 1 - Back',
+    left:  'Camera 2 - Left',
+    right: 'Camera 3 - Right',
+    data:  'DP Full Screen',
+  };
   const SCENE_TO_CAM = {
     'Camera 1 - Back':  'back',
     'Camera 2 - Left':  'left',
@@ -23,11 +35,35 @@ function App() {
     'Emergency':        'emergency',
   };
   const liveCamera = LIVE_CAM_NUM[liveCamId];
+  // Camera that arrow-key PTZ acts on: prefer the cued camera so operators
+  // can frame the next shot before taking it, fall back to live when
+  // nothing is cued so basic jog still works.
+  const ptzTargetCam = cuedSceneId != null ? LIVE_CAM_NUM[cuedSceneId] : liveCamera;
   // Called by child components after they switch OBS scenes so the live-camera
   // marker is updated immediately (without waiting for the next OBS poll).
   const setLiveCamFromNumber = (n) => {
     const id = CAM_NUM_TO_ID[n];
     if (id) setLiveCam(id);
+  };
+
+  // Called by PresetGrid when a thumb is armed on camera N. Syncs the
+  // scene cue to that camera's scene so the live feed card reflects the
+  // same CUE state as the thumb. Passing null clears the cue.
+  const setCuedSceneFromNumber = (n) => {
+    if (n == null) { setCuedSceneId(null); return; }
+    const id = CAM_NUM_TO_ID[n];
+    if (id) setCuedSceneId(id);
+  };
+
+  // Take the currently cued scene to program. Switches OBS scene, updates
+  // liveCamId, and clears the cue. No-op if nothing is cued.
+  const takeCuedScene = () => {
+    if (!cuedSceneId) return;
+    const scene = SCENE_FOR_ID[cuedSceneId];
+    if (window.OBS && scene) window.OBS.switchScene(scene).catch(() => {});
+    setLiveCam(cuedSceneId);
+    window.Log?.add('live', `LIVE → ${cuedSceneId.toUpperCase()}`, scene);
+    setCuedSceneId(null);
   };
   const [queueRunning, setQueueRunning] = useState(false);
   const [queueIdx, setQueueIdx] = useState(0);
@@ -48,6 +84,7 @@ function App() {
     if (window.OBS) window.OBS.switchScene(window.OBS.SCENE.emergency).catch(() => {});
     setQueueRunning(false);
     setLiveCam('emergency');
+    setCuedSceneId(null);
     window.Log?.add('emergency', 'Emergency cut triggered');
   };
 
@@ -153,6 +190,9 @@ function App() {
           window.Log?.add('live', `Scene → ${scene}`, 'external');
           if (camId === 'emergency') setQueueRunning(false);
           setLiveCam(camId);
+          // Scene is now live — if it was the cued one (or any other),
+          // the cue is fulfilled / stale. Clear it.
+          setCuedSceneId(null);
         })
         .catch(() => {});
     };
@@ -161,13 +201,19 @@ function App() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  // Keyboard shortcuts — PTZ only. Arrow keys pulse pan/tilt on the
-  // currently-live physical camera; +/− pulse zoom; Shift slows both down
-  // for fine adjustments. Escape stays because it's the standard close-
-  // modal affordance (legend overlay, activity panel). Operational
-  // shortcuts for TAKE / queue / emergency / record / stream / audio /
-  // lights / preset recall have all been removed — everything is driven
-  // from the UI buttons, which eliminates misfires during live services.
+  // Keyboard shortcuts. Kept tight to prevent live-service misfires:
+  //
+  //   1–4              Cue scene (Back / Left / Right / Data). Pressing
+  //                    the same number again takes it live, matching the
+  //                    "second click" behaviour on feed cards.
+  //   Space            Take the cued scene live. No-op if nothing cued.
+  //   Arrow keys       PTZ on the cued camera, or live if no cue.
+  //   + / − / = / _    Zoom on the same target.
+  //   Shift + Arrow    Fine adjust.
+  //   Escape           Close legend / activity panel (accessibility).
+  //
+  // No other operational shortcuts — audio source, lights, emergency,
+  // record, stream, preset recall etc. all remain button-only.
   useEffect(() => {
     const onKey = (e) => {
       // Don't hijack keys typed into inputs (prompt boxes, future form fields).
@@ -176,8 +222,25 @@ function App() {
 
       if (e.key === "Escape") { setShowLegend(false); setShowActivity(false); return; }
 
-      // PTZ shortcuts act on the currently-live physical camera.
-      if (!liveCamera || liveCamera === 0) return;
+      // Scene cue / take. Matches the feed two-click model.
+      const KEY_TO_SCENE = { '1': 'back', '2': 'left', '3': 'right', '4': 'data' };
+      if (KEY_TO_SCENE[e.key]) {
+        e.preventDefault();
+        const target = KEY_TO_SCENE[e.key];
+        if (cuedSceneId === target) {
+          // Second press → take live, same as clicking a cued card.
+          takeCuedScene();
+        } else {
+          setCuedSceneId(target);
+          window.Log?.add('live', `CUE scene → ${target.toUpperCase()}`, SCENE_FOR_ID[target]);
+        }
+        return;
+      }
+      if (e.key === ' ') { e.preventDefault(); takeCuedScene(); return; }
+
+      // PTZ target: cued camera wins, falls back to live if nothing cued.
+      // data scene (cam 0) has no PTZ — bail.
+      if (!ptzTargetCam || ptzTargetCam === 0) return;
       const fine = e.shiftKey ? 0.4 : 1;
       const panSpd  = Math.max(1, Math.min(24, Math.round(rail.ptzSpeed * 2.4 * fine)));
       const zoomSpd = Math.max(1, Math.min(7,  Math.round(rail.ptzSpeed * 0.7 * fine)));
@@ -185,17 +248,17 @@ function App() {
       if (!pulse) return;
 
       switch (e.key) {
-        case 'ArrowUp':    e.preventDefault(); pulse(liveCamera, `up&${panSpd}&${panSpd}`,    'ptzstop'); return;
-        case 'ArrowDown':  e.preventDefault(); pulse(liveCamera, `down&${panSpd}&${panSpd}`,  'ptzstop'); return;
-        case 'ArrowLeft':  e.preventDefault(); pulse(liveCamera, `left&${panSpd}&${panSpd}`,  'ptzstop'); return;
-        case 'ArrowRight': e.preventDefault(); pulse(liveCamera, `right&${panSpd}&${panSpd}`, 'ptzstop'); return;
-        case '+':          case '=': e.preventDefault(); pulse(liveCamera, `zoomin&${zoomSpd}`,  'zoomstop'); return;
-        case '-':          case '_': e.preventDefault(); pulse(liveCamera, `zoomout&${zoomSpd}`, 'zoomstop'); return;
+        case 'ArrowUp':    e.preventDefault(); pulse(ptzTargetCam, `up&${panSpd}&${panSpd}`,    'ptzstop'); return;
+        case 'ArrowDown':  e.preventDefault(); pulse(ptzTargetCam, `down&${panSpd}&${panSpd}`,  'ptzstop'); return;
+        case 'ArrowLeft':  e.preventDefault(); pulse(ptzTargetCam, `left&${panSpd}&${panSpd}`,  'ptzstop'); return;
+        case 'ArrowRight': e.preventDefault(); pulse(ptzTargetCam, `right&${panSpd}&${panSpd}`, 'ptzstop'); return;
+        case '+':          case '=': e.preventDefault(); pulse(ptzTargetCam, `zoomin&${zoomSpd}`,  'zoomstop'); return;
+        case '-':          case '_': e.preventDefault(); pulse(ptzTargetCam, `zoomout&${zoomSpd}`, 'zoomstop'); return;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [liveCamera, rail.ptzSpeed]);
+  }, [liveCamera, ptzTargetCam, cuedSceneId, rail.ptzSpeed]);
 
   return (
     <div className="app">
@@ -214,6 +277,7 @@ function App() {
           setLive={setLive}
           liveCamera={liveCamera}
           setLiveCamFromNumber={setLiveCamFromNumber}
+          setCuedSceneFromNumber={setCuedSceneFromNumber}
           admin={admin}
           queueRunning={queueRunning}
           setQueueRunning={setQueueRunning}
@@ -224,6 +288,9 @@ function App() {
         <LiveFeedRow
           liveCamId={liveCamId}
           setLiveCam={setLiveCam}
+          cuedSceneId={cuedSceneId}
+          setCuedSceneId={setCuedSceneId}
+          takeCuedScene={takeCuedScene}
           ptzSpeed={rail.ptzSpeed}
           onTake={onTake}
         />

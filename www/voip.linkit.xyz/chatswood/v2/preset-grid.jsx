@@ -334,7 +334,7 @@ const PRESET_ACTIONS = {
 const MIME_CAMERA = 'application/x-ls-camera';       // live-feed → preset (capture live PTZ)
 const MIME_PRESET = 'application/x-ls-preset-slot';  // preset   → preset (copy saved values)
 
-function ThumbCard({ preset, id, onAir, selected, inMotion, refreshTs, compact, onClick, onContextMenu, onDropCamera, onDropPreset, queueBadge }) {
+function ThumbCard({ preset, id, onAir, selected, inMotion, liveWarn, refreshTs, compact, onClick, onContextMenu, onDropCamera, onDropPreset, queueBadge }) {
   const [dragOver, setDragOver] = useStatePG(false);
 
   // Only presets with saved abs values make sense as a drag SOURCE — there's
@@ -413,6 +413,11 @@ function ThumbCard({ preset, id, onAir, selected, inMotion, refreshTs, compact, 
         {onAir && <span className="thumb-livebadge">LIVE</span>}
         {selected && !onAir && <span className="thumb-cuebadge">CUE</span>}
         {queueBadge != null && <span className="thumb-timer">{queueBadge}s</span>}
+        {/* Hover warning: this preset's camera is currently on program but
+            this isn't the on-air thumb. Clicking would physically move a
+            camera that's ON AIR, which will be visible to viewers. CSS
+            only shows this on :hover to keep the grid readable. */}
+        {liveWarn && !onAir && <span className="thumb-livewarn">LIVE</span>}
       </div>
       <div className="thumb-meta">
         <span className={"thumb-num" + (onAir ? " num-live" : "")}>{preset.camera}</span>
@@ -422,7 +427,7 @@ function ThumbCard({ preset, id, onAir, selected, inMotion, refreshTs, compact, 
   );
 }
 
-function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, onThumbCopy }) {
+function PresetColumn({ bucket, liveId, liveCameraNum, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, onThumbCopy }) {
   const presets = bucket.slots.map(presetFor);
   return (
     <div className="pcol" style={{ gridColumn: `span ${bucket.span}` }}>
@@ -434,6 +439,12 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
           const id = `${bucket.key}-${p.slot}`;
           const isActive = activeByCam[p.camera] === id;
           const isMotion = motionByCam[p.camera] === id;
+          // Hover "LIVE" warning if this preset's camera is currently on
+          // program (and this isn't the already-live thumb). Clicking
+          // would move a camera that viewers are watching.
+          const liveWarn = liveCameraNum != null
+            && Number(p.camera) === Number(liveCameraNum)
+            && liveId !== id;
           return (
             <ThumbCard
               key={id}
@@ -442,6 +453,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
               onAir={liveId === id}
               selected={isActive && liveId !== id}
               inMotion={isMotion}
+              liveWarn={liveWarn}
               refreshTs={refreshMap[id]}
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, bucket)}
@@ -457,7 +469,7 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
 
 const QUEUE_BUCKET = { key: 'queue', title: 'Queue', slots: QUEUE_SLOTS, cols: 2, span: 2 };
 
-function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, onThumbCopy, queueLiveIdx, queueTimer }) {
+function AutoQueueColumn({ running, setRunning, advance, liveId, liveCameraNum, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext, onThumbDrop, onThumbCopy, queueLiveIdx, queueTimer }) {
   return (
     <div className="pcol pcol-queue" style={{ gridColumn: "span 2" }}>
       <div className="pcol-head pcol-head-queue">
@@ -478,6 +490,9 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
           const isActive = activeByCam[cam] === id;
           const isMotion = motionByCam[cam] === id;
           const onAir = liveId === id;
+          const liveWarn = liveCameraNum != null
+            && Number(p.camera) === Number(liveCameraNum)
+            && !onAir;
           // Live item shows a live countdown; others show their stored timeout.
           const badge = (onAir && idx === queueLiveIdx && queueTimer != null)
             ? queueTimer
@@ -490,6 +505,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
               onAir={onAir}
               selected={isActive && !onAir}
               inMotion={isMotion}
+              liveWarn={liveWarn}
               refreshTs={refreshMap[id]}
               queueBadge={badge}
               onClick={() => onThumbClick(id, p)}
@@ -504,7 +520,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, mo
   );
 }
 
-function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, queueRunning, setQueueRunning, queueIdx, advanceQueue, showCustom }) {
+function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, setCuedSceneFromNumber, admin, queueRunning, setQueueRunning, queueIdx, advanceQueue, showCustom }) {
   // Per-camera state: each camera has at most one "at-position" preset (the
   // last one it moved to) and at most one "in-motion" preset.
   const [activeByCam, setActiveByCam] = useStatePG({});
@@ -874,6 +890,9 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     if (activeByCam[cam] === id) {
       takeLive(preset);
       setLiveCamFromNumber && setLiveCamFromNumber(preset.camera);
+      // Take is committed — drop the scene cue (the external OBS poll
+      // would clear it soon anyway, but make it immediate).
+      setCuedSceneFromNumber && setCuedSceneFromNumber(null);
       return;
     }
 
@@ -888,6 +907,9 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     moveCamera(preset);
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setMotionByCam(m => ({ ...m, [cam]: id }));
+    // Cueing a thumb also cues the scene for its camera — "only one cue'd
+    // scene at once" is enforced by the single-slot cuedSceneId in App.
+    setCuedSceneFromNumber && setCuedSceneFromNumber(preset.camera);
 
     // Wait for the camera to actually arrive before touching motion marker /
     // thumb / log. `settle()` polls VISCA every ~250 ms until two consecutive
@@ -943,6 +965,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
           key={b.key}
           bucket={b}
           liveId={liveId}
+          liveCameraNum={liveCamera}
           activeByCam={activeByCam}
           motionByCam={motionByCam}
           refreshMap={refreshMap}
@@ -957,6 +980,7 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         setRunning={setQueueRunning}
         advance={advanceQueueInternal}
         liveId={liveId}
+        liveCameraNum={liveCamera}
         activeByCam={activeByCam}
         motionByCam={motionByCam}
         refreshMap={refreshMap}
