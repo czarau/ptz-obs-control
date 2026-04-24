@@ -1,0 +1,16 @@
+# Keep everything as LF locally and in the repo. The server runs Linux and
+# core.autocrlf=true on Windows would otherwise rewrite files to CRLF on each
+# checkout, producing noisy warnings and spurious diffs.
+* text=auto eol=lf
+
+# Binary file types — leave them alone regardless of the rule above.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.zip   binary
+*.pdf   binary
+
+# PowerShell scripts only ever run on Windows — keep CRLF there.
+*.ps1   text eol=crlf
