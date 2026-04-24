@@ -9,26 +9,36 @@ function smartDevice(device, state) {
   return fetch(url, { method: 'GET', mode: 'cors' }).catch(() => {});
 }
 
+const DEVICE_LABEL = { SPOTS: 'Spots', STAGE: 'Stage', FRONT: 'Front', LG_LEFT: 'TV Left', LG_RIGHT: 'TV Right' };
+const AUDIO_LABEL  = { church: 'Church Mix', video: 'Video Mix', backup: 'Video Mix (Backup)' };
+
 function LeftRail({ state, setState, onEmergency }) {
   const toggleDevice = (key, device) => {
     const next = !state[key];
     setState(s => ({ ...s, [key]: next }));
     smartDevice(device, next);
+    window.Log?.add('lights', `${DEVICE_LABEL[device] || device} → ${next ? 'ON' : 'OFF'}`);
   };
 
   const selectAudio = (kind) => {
+    if (state.audio === kind) return;
     setState(s => ({ ...s, audio: kind }));
     if (window.OBS) window.OBS.setAudioSource(kind).catch(() => {});
+    window.Log?.add('audio', `Audio source → ${AUDIO_LABEL[kind] || kind}`);
   };
 
   const toggleRecord = () => {
-    setState(s => ({ ...s, recording: !s.recording }));
+    const next = !state.recording;
+    setState(s => ({ ...s, recording: next }));
     if (window.OBS) window.OBS.toggleRecord().catch(() => {});
+    window.Log?.add('broadcast', `Recording ${next ? 'started' : 'stopped'}`);
   };
 
   const toggleStream = () => {
-    setState(s => ({ ...s, streaming: !s.streaming }));
+    const next = !state.streaming;
+    setState(s => ({ ...s, streaming: next }));
     if (window.OBS) window.OBS.toggleStream().catch(() => {});
+    window.Log?.add('broadcast', `Streaming ${next ? 'started' : 'stopped'}`);
   };
 
   return (
@@ -117,6 +127,7 @@ function Icon({ name, size = 14 }) {
     case "swap":   return <svg {...common}><path d="M3 5h9l-2-2M13 11H4l2 2"/></svg>;
     case "play":   return <svg {...common}><path d="M5 3l8 5-8 5V3z" fill={stroke}/></svg>;
     case "pause":  return <svg {...common}><rect x="4" y="3" width="3" height="10"/><rect x="9" y="3" width="3" height="10"/></svg>;
+    case "log":    return <svg {...common}><path d="M3 3h10v10H3z"/><path d="M5 6h6M5 8h6M5 10h4"/></svg>;
     default: return null;
   }
 }

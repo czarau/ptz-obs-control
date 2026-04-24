@@ -22,6 +22,11 @@ function ptzCmd(camera, query) {
   if (!base) return;
   // no-cors: the cameras don't return CORS headers but accept the request.
   fetch(`${base}/cgi-bin/ptzctrl.cgi?ptzcmd&${query}`, { mode: 'no-cors' }).catch(() => {});
+  // Any manual jog (that isn't a stop) invalidates the "at-position" marker
+  // for this camera — notify the preset grid so it clears the selected state.
+  if (!/stop$/i.test(query)) {
+    window.dispatchEvent(new CustomEvent('ptz:manual-move', { detail: { camera } }));
+  }
 }
 
 function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptzSpeed }) {
@@ -37,6 +42,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptz
           onClick={() => {
             setLiveCam(c.id);
             if (window.OBS) window.OBS.switchScene(c.scene).catch(() => {});
+            window.Log?.add('live', `LIVE feed → ${c.label}`, c.scene);
           }}
         />
       ))}
@@ -61,7 +67,12 @@ function LiveFeed({ cam, onAir, onClick, ptzSpeed }) {
   return (
     <div className={"feed" + (onAir ? " feed-onair" : "")}>
       <div className="feed-head">
-        <span className="feed-title">{cam.label}</span>
+        <span className="feed-head-left">
+          {cam.camera > 0 && (
+            <span className={"thumb-num" + (onAir ? " num-live" : "")}>{cam.camera}</span>
+          )}
+          <span className="feed-title">{cam.label}</span>
+        </span>
         {onAir && <span className="feed-live"><span/>LIVE</span>}
         {!onAir && <span className="feed-hint">{cam.hint}</span>}
       </div>
@@ -157,12 +168,12 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
 }
 
 function ZoomIcon({ kind }) {
-  const w = kind === "tele";
+  const tele = kind === "tele";
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="6" cy="6" r="4"/>
       <path d="M9 9l3 3"/>
-      <path d={w ? "M4 6h4" : "M4 6h4M6 4v4"}/>
+      <path d={tele ? "M4 6h4M6 4v4" : "M4 6h4"}/>
     </svg>
   );
 }

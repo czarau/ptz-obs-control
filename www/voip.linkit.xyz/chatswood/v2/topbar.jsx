@@ -1,7 +1,7 @@
 // Top bar: service cue list (static agenda for now), shortcut legend, live clock.
 const { useState: useStateTB, useEffect: useEffectTB } = React;
 
-function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend }) {
+function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend, showActivity, setShowActivity }) {
   const cues = [
     { t: "10:30", label: "Welcome",        who: "Pastor J." },
     { t: "10:33", label: "Announcements",  who: "Sarah K." },
@@ -50,6 +50,7 @@ function TopBar({ cueIdx, setCueIdx, showLegend, setShowLegend }) {
       </div>
 
       <div className="topbar-right">
+        <ActivityToggle open={showActivity} onClick={() => setShowActivity(v => !v)} />
         <button className="legend-btn" onClick={() => setShowLegend(v => !v)}>
           <kbd>?</kbd>
           <span>Shortcuts</span>

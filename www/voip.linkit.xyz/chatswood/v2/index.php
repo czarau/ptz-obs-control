@@ -58,12 +58,15 @@
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
 
+  <script src="activity-log.js"></script>
   <script src="obs-client.js"></script>
+  <script src="ptz-state.js"></script>
   <script type="text/babel" src="thumbs.jsx"></script>
   <script type="text/babel" src="left-rail.jsx"></script>
   <script type="text/babel" src="preset-grid.jsx"></script>
   <script type="text/babel" src="live-feeds.jsx"></script>
   <script type="text/babel" src="topbar.jsx"></script>
+  <script type="text/babel" src="activity-panel.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
 </body>
 </html>

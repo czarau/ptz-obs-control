@@ -175,9 +175,20 @@
     if (!is_numeric($cam))
       die;
 
+    header('Content-Type: application/json');
     $ip = GetCameraIP($cam);
-    $json = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip));
-    echo $json;
+    $raw = shell_exec("python3.9 \"".__dir__."/python/cam_control.py\" --ip=".escapeshellarg($ip)." 2>&1");
+    $trimmed = trim($raw);
+
+    // If the Python command produced real JSON, pass it through unchanged.
+    $probe = json_decode($trimmed, true);
+    if ($probe !== null) {
+      echo $trimmed;
+    } else {
+      // Otherwise surface whatever stderr/stdout came back so the caller can
+      // diagnose (python missing, VISCA timeout, etc).
+      echo json_encode(['error' => 'cam_control.py failed', 'stderr' => $trimmed]);
+    }
   }
   elseif ($_GET['cmd'] == 'goto')
   {

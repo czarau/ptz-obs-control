@@ -173,14 +173,16 @@ zoom = cam.get_zoom_position();
 #print("Getting Focus Position...")
 focus = cam.get_focus_position();
 
-print("{")
-print(f"  camera: \"{args.ip}\",")
+import json as _json
 
+_out = {
+    "camera": args.ip,
+    "pan":    pan,
+    "tilt":   tilt,
+    "zoom":   zoom,
+    "focus":  focus,
+}
 if response != '':
-  print(f"  response: \"{response}\",")
+    _out["response"] = response
 
-print(f"  pan: {pan},")
-print(f"  tilt: {tilt},")
-print(f"  zoom: {zoom},")
-print(f"  focus: {focus}")
-print("}")
+print(_json.dumps(_out))

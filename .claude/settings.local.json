@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood2/index.php)",
+      "Bash(tasklist //FI \"IMAGENAME eq php.exe\")",
+      "Bash(curl -s http://127.0.0.1:18745/index.php)",
+      "Bash(taskkill //PID 17780 //F)",
+      "Bash(php -l www/voip.linkit.xyz/chatswood/v2/index.php)",
+      "Bash(php -l D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/v2/index.php)",
+      "Bash(php -l D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/control_thumb.php)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/python/cam_control.py'\\).read\\(\\)\\); print\\('Python syntax OK'\\)\")",
+      "Bash(py -c \"import ast; ast.parse\\(open\\('D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/python/cam_control.py'\\).read\\(\\)\\); print\\('Python syntax OK'\\)\")",
+      "Bash(curl -sk -w '\\\\nHTTP: %{http_code}\\\\n' 'https://srv-syd05.chatswoodchurch.org/chatswood/control_thumb.php?cmd=ptz&camera=__TRACKED_VAR__' --max-time 15)",
+      "Bash(curl -sk -w \"\\\\nHTTP: %{http_code}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=1\" --max-time 15)",
+      "Bash(curl -sk -w \"\\\\nHTTP: %{http_code}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/chatswood/v2/index.php\" --max-time 15)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/v2/\" --max-time 10)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/v2/index.php\" --max-time 10)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/index.php\" --max-time 10)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code} bytes:%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=thumb_cache&id=100\" --max-time 10)",
+      "Bash(curl -sk -w \"\\\\n--- headers: status=%{http_code} size=%{size_download} time=%{time_total}s\\\\n\" \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=1\" --max-time 30)",
+      "Bash(curl -sk -w \"\\\\ndone: size=%{size_download} time=%{time_total}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=2\" --max-time 30)",
+      "Bash(curl -sk -w \"\\\\ndone: size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=init\" --max-time 30)",
+      "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8806/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)",
+      "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8807/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)",
+      "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8808/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)"
+    ]
+  }
+}
