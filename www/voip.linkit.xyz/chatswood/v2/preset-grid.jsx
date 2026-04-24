@@ -642,11 +642,17 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
   // (same action as right-click → Save Camera Back/Left/Right, but via
   // direct-manipulation).
   const onThumbDrop = (id, preset, cam) => {
+    const label = preset.label || `slot ${preset.slot}`;
+    window.Log?.add('camera', `Drop-save · Cam ${cam} → ${label}`,
+      `capturing PTZ…`);
     const next = { ...preset, label: preset.label || 'Preset' };
-    PRESET_ACTIONS.savePosition(next, cam).then(() => {
-      setRefreshMap(m => ({ ...m, [id]: Date.now() + 1 }));
-    });
-    window.Log?.add('camera', `Drop · Cam ${cam} → ${preset.label || 'slot ' + preset.slot}`);
+    PRESET_ACTIONS.savePosition(next, cam)
+      .then(() => {
+        setRefreshMap(m => ({ ...m, [id]: Date.now() + 1 }));
+      })
+      .catch(err => {
+        window.Log?.add('error', `Drop-save failed · Cam ${cam} → ${label}`, String(err));
+      });
   };
 
   const onThumbClick = async (id, preset) => {

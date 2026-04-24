@@ -186,14 +186,13 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
     e.dataTransfer.setData('application/x-ls-camera', String(cam.camera));
     e.dataTransfer.setData('text/plain', `Camera ${cam.camera}`);
     e.dataTransfer.effectAllowed = 'copy';
+    window.Log?.add('camera', `Drag start · ${cam.label}`, 'drop on a preset thumb to save');
   } : undefined;
 
   return (
     <div
       className={"feed" + (onAir ? " feed-onair" : "")}
       onContextMenu={onContextMenu}
-      draggable={cam.camera > 0}
-      onDragStart={onDragStart}
     >
       <div className="feed-head">
         <span className="feed-head-left">
@@ -205,7 +204,15 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
         {onAir && <span className="feed-live"><span/>LIVE</span>}
         {!onAir && <span className="feed-hint">{cam.hint}</span>}
       </div>
-      <button className="feed-img" onClick={onClick}>
+      {/* draggable on feed-img only so ptzpad arrows / zoom / focus buttons
+       *  below remain interactive (mousedown there would otherwise start a
+       *  drag instead of panning the camera). */}
+      <button
+        className="feed-img"
+        onClick={onClick}
+        draggable={cam.camera > 0}
+        onDragStart={onDragStart}
+      >
         <video
           ref={videoRef}
           autoPlay
