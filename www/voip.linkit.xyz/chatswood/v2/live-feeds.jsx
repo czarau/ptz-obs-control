@@ -193,24 +193,17 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
     e.preventDefault();
     pulseFocus(e.deltaY < 0 ? 'far' : 'near');
   };
-  // Wheel on the joystick: default = zoom (standard PTZ-controller feel).
-  // Shift+wheel = tilt (up/down).
-  const onJoyWheel = (e) => {
-    e.preventDefault();
-    if (e.shiftKey) {
-      pulsePan(e.deltaY < 0 ? 't' : 'b');
-    } else {
-      pulseZoom(e.deltaY < 0 ? 'tele' : 'wide');
-    }
-  };
 
-  // Press+release handlers
+  // Press+release handlers. Mousewheel pulses the same direction as the
+  // arrow you're hovering over (one tick = one brief pulse), so wheel over
+  // the UP arrow nudges the camera up, wheel over LEFT pans left, etc.
   const pan = (d) => ({
     onMouseDown: () => start(d),
     onMouseUp: stop,
     onMouseLeave: stop,
     onTouchStart: () => start(d),
     onTouchEnd: stop,
+    onWheel: (e) => { e.preventDefault(); pulsePan(d); },
   });
   const ctrl = (onStart, onEnd) => ({
     onMouseDown: onStart, onMouseUp: onEnd, onMouseLeave: onEnd,
@@ -219,7 +212,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
 
   return (
     <div className="ptzpad">
-      <div className="ptzpad-joy" aria-label="Pan/Tilt" onWheel={onJoyWheel}>
+      <div className="ptzpad-joy" aria-label="Pan/Tilt">
         <div className="joy-ring">
           <button className="joy-arrow joy-tl" aria-label="Pan up-left"   {...pan('tl')}><Arrow d="tl"/></button>
           <button className="joy-arrow joy-t"  aria-label="Tilt up"       {...pan('t')}><Arrow d="t"/></button>
