@@ -131,6 +131,32 @@ const PRESET_ACTIONS = {
     window.Log?.add('system', `Set timeout · ${preset.label} → ${secs}s`);
   },
 
+  // Flag this preset as the Home position for its camera. The Home button
+  // on that camera's PTZ pad will then recall this preset instead of calling
+  // the factory home.
+  saveAsHome(preset) {
+    const cam = Number(preset.camera);
+    const params = new URLSearchParams({
+      cmd: 'set_home',
+      user: PRESET_ACTIONS.user(),
+      camera: String(cam),
+      slot: String(preset.slot),
+      ts: String(Date.now()),
+    });
+    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        // Update the in-memory cache so the Home button picks it up immediately.
+        if (!window.LS_CONFIG) return;
+        if (!window.LS_CONFIG.home || typeof window.LS_CONFIG.home !== 'object') {
+          window.LS_CONFIG.home = {};
+        }
+        window.LS_CONFIG.home[String(cam)] = preset.slot;
+        window.Log?.add('system', `Home set · Cam ${cam}`, preset.label || `slot ${preset.slot}`);
+      })
+      .catch(() => {});
+  },
+
   async getAdminPreset(preset) {
     const url = `${PRESET_ACTIONS.endpoint()}?cmd=get_preset&user=${PRESET_ACTIONS.user()}&admin=1&id=${preset.slot}&ts=${Date.now()}`;
     try {
@@ -424,6 +450,12 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
       { label: 'Save Camera Back',  icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 1); setTimeout(bumpThumb, 1500); } },
       { label: 'Save Camera Left',  icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 2); setTimeout(bumpThumb, 1500); } },
       { label: 'Save Camera Right', icon: ICO('crosshairs'), onClick: () => { PRESET_ACTIONS.savePosition(preset, 3); setTimeout(bumpThumb, 1500); } },
+      { separator: true },
+      {
+        label: 'Save as Home',
+        icon: ICO('home'),
+        onClick: () => PRESET_ACTIONS.saveAsHome(preset),
+      },
       { separator: true },
       {
         label: 'Rename',

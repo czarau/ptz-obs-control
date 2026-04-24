@@ -222,7 +222,19 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
           <button className="joy-arrow joy-b"  aria-label="Tilt down"     {...pan('b')}><Arrow d="b"/></button>
           <button className="joy-arrow joy-bl" aria-label="Pan down-left" {...pan('bl')}><Arrow d="bl"/></button>
           <button className="joy-arrow joy-l"  aria-label="Pan left"      {...pan('l')}><Arrow d="l"/></button>
-          <button className="joy-center" aria-label="Home" onClick={() => ptzCmd(camera, 'home')}>
+          <button className="joy-center" aria-label="Home" onClick={() => {
+            // If the user has flagged a preset as this camera's Home via the
+            // preset context menu, recall that preset. Otherwise fall back to
+            // the camera's factory home.
+            const home = (window.LS_CONFIG?.home || {})[String(camera)];
+            if (home != null) {
+              const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(home);
+              fetch(`${CAM_BASE[camera]}/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&${presetId}`, { mode: 'no-cors' }).catch(() => {});
+              window.Log?.add('camera', `Home · Cam ${camera}`, `slot ${home}`);
+            } else {
+              ptzCmd(camera, 'home');
+            }
+          }}>
             <span className="joy-center-dot" />
             <span className="joy-center-label">HOME</span>
           </button>

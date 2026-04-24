@@ -54,6 +54,7 @@
       presetStartIndex: <?= (int)($settings['preset_start_index'] ?? 100) ?>,
       presetAdminIndex: <?= (int)($settings['preset_admin_index'] ?? 150) ?>,
       presets:          <?= json_encode($settings['presets'] ?? []) ?>,
+      home:             <?= json_encode($settings['home'] ?? (object)[]) ?>,
       buckets:          <?= json_encode($buckets) ?>,
       queueSlots:       <?= json_encode($queueSlots) ?>,
       thumbEndpoint:    "../control_thumb.php",

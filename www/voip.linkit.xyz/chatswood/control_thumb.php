@@ -126,11 +126,11 @@
       $settingsfile = ".data/settings-shccc.json";
     else
       $settingsfile = ".data/settings.json";
-    
+
     $settings = json_decode(file_get_contents($settingsfile), true);
     $preset = array();
-    
-    if (isset($_GET['admin']) and $_GET['admin'] == 1) 
+
+    if (isset($_GET['admin']) and $_GET['admin'] == 1)
     {
       if (isset($settings['presets_admin'][$_GET['id']]))
         $preset = $settings['presets_admin'][$_GET['id']];
@@ -140,9 +140,33 @@
       if (isset($settings['presets'][$_GET['id']]))
         $preset = $settings['presets'][$_GET['id']];
     }
-    
+
     echo json_encode($preset);
-  }  
+  }
+  elseif ($_GET['cmd'] == 'set_home')
+  {
+    // Flag a preset slot as the "home" for a camera. The Home button in the
+    // UI calls poscall on that slot instead of the factory home.
+    //   ?cmd=set_home&user=<id>&camera=<n>&slot=<slot>
+    $settingsfile = ($_GET['user'] == 'shccc')
+      ? ".data/settings-shccc.json"
+      : ".data/settings.json";
+
+    if (!is_numeric($_GET['camera']) || !is_numeric($_GET['slot'])) die;
+    $cam  = (string)((int)$_GET['camera']);
+    $slot = (int)$_GET['slot'];
+
+    $settings = json_decode(file_get_contents($settingsfile), true) ?: [];
+    if (!isset($settings['home']) || !is_array($settings['home'])) {
+      $settings['home'] = [];
+    }
+    $settings['home'][$cam] = $slot;
+
+    $json = json_encode($settings, JSON_PRETTY_PRINT);
+    file_put_contents($settingsfile, $json);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true, 'home' => $settings['home']]);
+  }
   elseif ($_GET['cmd'] == 'thumb_cache')
   {
     // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=thumb_cache&id=100&ts=0
