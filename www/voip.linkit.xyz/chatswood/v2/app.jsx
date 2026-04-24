@@ -76,6 +76,12 @@ function App() {
 
   // Poll OBS current program scene so external scene changes (someone switching
   // in OBS directly, or an auto-queue advance) are reflected in the UI.
+  // NOTE: don't run side effects (Log, other setStates) inside a setState
+  // updater — React may invoke updaters during render, and triggering a
+  // cross-component setState from there produces "Cannot update a component
+  // while rendering" warnings. Compare against a ref and run side effects
+  // around a plain setState instead.
+  const lastSceneCamRef = React.useRef(null);
   useEffect(() => {
     if (!window.OBS) return;
     let alive = true;
@@ -84,16 +90,11 @@ function App() {
         .then(scene => {
           if (!alive) return;
           const camId = SCENE_TO_CAM[scene];
-          if (!camId) return;
-          setLiveCam(cur => {
-            if (cur === camId) return cur;
-            window.Log?.add('live', `Scene → ${scene}`, 'external');
-            // Externally switching to Emergency should also halt the
-            // auto-queue — matches the behaviour of clicking our own
-            // Emergency button.
-            if (camId === 'emergency') setQueueRunning(false);
-            return camId;
-          });
+          if (!camId || lastSceneCamRef.current === camId) return;
+          lastSceneCamRef.current = camId;
+          window.Log?.add('live', `Scene → ${scene}`, 'external');
+          if (camId === 'emergency') setQueueRunning(false);
+          setLiveCam(camId);
         })
         .catch(() => {});
     };

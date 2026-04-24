@@ -15,7 +15,12 @@
       detail: detail || null,
     });
     if (entries.length > MAX_ENTRIES) entries.length = MAX_ENTRIES;
-    subs.forEach(fn => { try { fn(); } catch (_) {} });
+    // Notify subscribers on the next microtask so a stray Log.add() from
+    // inside a React render/updater won't trigger "Cannot update a
+    // component while rendering" warnings.
+    Promise.resolve().then(() => {
+      subs.forEach(fn => { try { fn(); } catch (_) {} });
+    });
   }
 
   function subscribe(fn) { subs.add(fn); return () => subs.delete(fn); }
