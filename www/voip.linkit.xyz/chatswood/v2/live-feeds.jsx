@@ -17,6 +17,33 @@ const CAM_BASE = {
   3: 'https://srv-syd05.chatswoodchurch.org:8808',
 };
 
+// Grab the current frame from a camera's live WebRTC <video>, encode JPEG,
+// and POST it to ?cmd=save_thumb so the server-side thumbs/{id}.jpg cache
+// is updated. Instant (no camera round-trip, no await needed). Resolves to
+// true when stored, false if no frame was available so the caller can fall
+// back to a server-side action_snapshot.
+window.capturePresetThumb = function (camera, slot) {
+  try {
+    const video = (window.LIVE_VIDEOS || {})[camera];
+    if (!video || !video.videoWidth) return Promise.resolve(false);
+    const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(slot);
+    const w = 480;
+    const h = Math.round(w * video.videoHeight / video.videoWidth) || 270;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+    return new Promise(resolve => {
+      canvas.toBlob(blob => {
+        if (!blob) { resolve(false); return; }
+        const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+        fetch(`${endpoint}?cmd=save_thumb&id=${presetId}`, { method: 'POST', body: blob })
+          .then(r => resolve(r.ok))
+          .catch(() => resolve(false));
+      }, 'image/jpeg', 0.85);
+    });
+  } catch (_) { return Promise.resolve(false); }
+};
+
 // Shared brief-pulse helper for keyboard shortcuts and per-arrow wheel.
 // Goes through the PHP proxy so digest-auth is handled server-side.
 const _pulseTimers = {};
@@ -137,6 +164,19 @@ function LiveFeed({ cam, onAir, onClick, onContextMenu, ptzSpeed }) {
     const pc = window.startWebRTCPlay(videoRef.current, url);
     return () => { try { pc && pc.close(); } catch (_) {} };
   }, [cam.id]);
+
+  // Expose the <video> so the preset grid can grab a live frame and push it
+  // to the server as the outgoing thumb before the camera moves.
+  useEffectLF(() => {
+    if (!cam.camera || cam.camera === 0) return;
+    if (!window.LIVE_VIDEOS) window.LIVE_VIDEOS = {};
+    window.LIVE_VIDEOS[cam.camera] = videoRef.current;
+    return () => {
+      if (window.LIVE_VIDEOS && window.LIVE_VIDEOS[cam.camera] === videoRef.current) {
+        delete window.LIVE_VIDEOS[cam.camera];
+      }
+    };
+  }, [cam.camera]);
 
 
   return (

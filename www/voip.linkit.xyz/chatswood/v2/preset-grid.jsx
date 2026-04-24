@@ -384,15 +384,14 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     }
   }, [queueRunning]);
 
-  // Snapshot the camera's current view into the given thumb slot. Used
-  // whenever a camera is about to leave its "at-position" preset so the
-  // stored thumbnail stays in sync with what the camera was showing.
-  //
-  // Goes through control_thumb.php?cmd=thumb — which pulls a fresh
-  // action_snapshot from the camera (with digest auth) and writes it to
-  // thumbs/{presetId}.jpg server-side. Returns a Promise; callers should
-  // await this before issuing a move command so the snapshot completes
-  // BEFORE the camera starts repositioning.
+  // Snapshot the camera's current view into the given thumb slot. Hybrid:
+  //  1. Prefer the instant WebRTC path — grab a frame from the live <video>
+  //     and POST it to ?cmd=save_thumb. No camera round-trip, no await
+  //     needed by callers for correctness.
+  //  2. If no <video> frame is available (stream not loaded / cam 4 / off),
+  //     fall back to ?cmd=thumb which pulls a fresh action_snapshot from
+  //     the camera server-side with digest auth.
+  // Returns a Promise that resolves when the thumb is on disk.
   const snapshotActiveOnCam = (cam) => {
     const currentId = activeByCamRef.current[cam];
     if (!currentId) return Promise.resolve();
@@ -401,9 +400,20 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     const slot = parseInt(m[1], 10);
     const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + slot;
     const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-    return fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
-      .then(() => setRefreshMap(rm => ({ ...rm, [currentId]: Date.now() })))
-      .catch(() => {});
+    const bump = () => setRefreshMap(rm => ({ ...rm, [currentId]: Date.now() }));
+
+    const webRTC = window.capturePresetThumb
+      ? window.capturePresetThumb(Number(cam), slot)
+      : Promise.resolve(false);
+
+    return webRTC.then(ok => {
+      if (ok) { bump(); return; }
+      // Fallback: ask the server to pull from the camera. Slower, but the
+      // only way to capture if the live <video> hasn't buffered a frame.
+      return fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
+        .then(() => bump())
+        .catch(() => {});
+    });
   };
 
   // Clear the "at-position" marker for a camera whenever it's manually jogged
