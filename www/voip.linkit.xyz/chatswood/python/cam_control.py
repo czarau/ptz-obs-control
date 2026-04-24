@@ -141,9 +141,21 @@ class CameraPTZOptics:
 
     def recall_preset(self, preset_num: int):
         if preset_num < 16:
-            data = cam._send_command(f'04 3F 02 0{preset_num:x}') 
+            data = cam._send_command(f'04 3F 02 0{preset_num:x}')
         else:
-            data = cam._send_command(f'04 3F 02 {preset_num:x}') 
+            data = cam._send_command(f'04 3F 02 {preset_num:x}')
+
+    def set_focus_auto(self):
+        # VISCA: 81 01 04 38 02 FF  — continuous autofocus
+        return cam._send_command('04 38 02')
+
+    def set_focus_manual(self):
+        # VISCA: 81 01 04 38 03 FF  — manual focus
+        return cam._send_command('04 38 03')
+
+    def focus_onepush(self):
+        # VISCA: 81 01 04 18 01 FF  — one-push AF trigger (valid in manual mode)
+        return cam._send_command('04 18 01')
 
 # print("PTZ Optics Control v1.0")
 # https://ptzoptics.com/wp-content/uploads/2020/11/PTZOptics-VISCA-over-IP-Rev-1_2-8-20.pdf
@@ -166,6 +178,15 @@ if args.cmd == 'goto':
 if args.cmd == 'preset_speed':
     #print("Sending To Preset 100...")
     response = cam.set_preset_speed(int(args.val))
+
+if args.cmd == 'focus_auto':
+    response = cam.set_focus_auto()
+
+if args.cmd == 'focus_manual':
+    response = cam.set_focus_manual()
+
+if args.cmd == 'focus_onepush':
+    response = cam.focus_onepush()
 
 #print("Getting PTZ Position...")
 pan, tilt = cam.get_pantilt_position();

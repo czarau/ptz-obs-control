@@ -29,6 +29,16 @@ function ptzCmd(camera, query) {
   }
 }
 
+// Focus mode / one-push AF goes through control_thumb.php → VISCA
+// (PTZOptics 30X NDI doesn't expose focus mode over the HTTP CGI — only
+// movement commands work there). Corresponding server-side handlers are
+// cmd=focus_auto / focus_manual / focus_onepush.
+function focusCmd(camera, cmd) {
+  const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+  fetch(`${endpoint}?cmd=${cmd}&camera=${camera}&ts=${Date.now()}`).catch(() => {});
+  window.Log?.add('camera', `Focus ${cmd.replace('focus_', '')} · Cam ${camera}`);
+}
+
 function LiveFeedRow({ liveCamId, setLiveCam, overlays, setOverlays, onTake, ptzSpeed }) {
   const cams = [CAM_META.back, CAM_META.left, CAM_META.right, CAM_META.data];
   return (
@@ -160,7 +170,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
             <button className="ctrl-btn" aria-label="Focus near" {...ctrl(() => focusStart('near'), focusStop)}><FocusIcon kind="near"/><em>NEAR</em></button>
             <button className="ctrl-btn" aria-label="Focus far"  {...ctrl(() => focusStart('far'),  focusStop)}><FocusIcon kind="far"/><em>FAR</em></button>
           </div>
-          <button className="ctrl-auto" aria-label="Auto focus" onClick={() => ptzCmd(camera, 'focusauto')}>AUTO</button>
+          <button className="ctrl-auto" aria-label="Auto focus" onClick={() => focusCmd(camera, 'focus_auto')}>AUTO</button>
         </div>
       </div>
     </div>

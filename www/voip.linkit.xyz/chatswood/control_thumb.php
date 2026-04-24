@@ -248,6 +248,29 @@
       escapeshellarg($val)
     ));
     echo $json;
+  }
+  elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
+  {
+    // Focus mode / one-push AF via VISCA (the HTTP CGI on 30X NDI doesn't
+    // expose these — only movement commands).
+    //   ?cmd=focus_auto&camera=1    — continuous autofocus
+    //   ?cmd=focus_manual&camera=1  — manual focus (NEAR/FAR then holds)
+    //   ?cmd=focus_onepush&camera=1 — one-push AF trigger while in manual
+    $cam = $_GET['camera'];
+    if (!is_numeric($cam)) die;
+
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) die;
+
+    header('Content-Type: application/json');
+    $json = shell_exec(sprintf(
+      "python3.9 %s --ip=%s --port=%s --cmd=%s 2>&1",
+      escapeshellarg(__dir__."/python/cam_control.py"),
+      escapeshellarg($visca[0]),
+      escapeshellarg((string)$visca[1]),
+      escapeshellarg($_GET['cmd'])
+    ));
+    echo $json;
   }     
   
 ?>

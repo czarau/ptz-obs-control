@@ -25,7 +25,10 @@
       "Bash(curl -sk -w \"\\\\nstatus=%{http_code} size=%{size_download}\\\\n\" \"https://srv-syd05.chatswoodchurch.org:8808/cgi-bin/ptzctrl.cgi?ptzcmd&home\" --max-time 10)",
       "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=1\")",
       "Bash(php -l www/voip.linkit.xyz/chatswood/control_thumb.php)",
-      "Bash(py -c \"import ast; ast.parse\\(open\\('D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/python/cam_control.py'\\).read\\(\\)\\); print\\('Python OK'\\)\")"
+      "Bash(py -c \"import ast; ast.parse\\(open\\('D:/Code/Personal/CameraControl/www/voip.linkit.xyz/chatswood/python/cam_control.py'\\).read\\(\\)\\); print\\('Python OK'\\)\")",
+      "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=2\")",
+      "Bash(curl -sk --max-time 30 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=ptz&camera=3\")",
+      "Bash(curl -sk --max-time 20 \"https://srv-syd05.chatswoodchurch.org/control_thumb.php?cmd=focus_auto&camera=1\")"
     ]
   }
 }
