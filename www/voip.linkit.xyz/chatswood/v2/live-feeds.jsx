@@ -278,7 +278,39 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
           </div>
           <button className="ctrl-auto" aria-label="Auto focus" onClick={() => focusCmd(camera, 'focus_auto')}>AUTO</button>
         </div>
+        {camera === 1 && <FollowFaceToggle camera={camera} />}
       </div>
+    </div>
+  );
+}
+
+// Face-tracking toggle. Calls the CMP (PTZOptics Camera Management Platform)
+// running on srv-syd05:8810 via the existing control_thumb.php?cmd=face
+// wrapper. Local state — the CMP doesn't expose a status endpoint, so toggles
+// are optimistic and persist only until the page reloads.
+function FollowFaceToggle({ camera }) {
+  const [on, setOn] = useStateLF(false);
+  const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    fetch(`${endpoint}?cmd=face&camera=${camera}&pos=${next ? 1 : 0}&ts=${Date.now()}`).catch(() => {});
+    window.Log?.add('camera', `Face tracking ${next ? 'ON' : 'OFF'} · Cam ${camera}`);
+  };
+
+  return (
+    <div className="ctrl-group">
+      <div className="ctrl-label">FOLLOW</div>
+      <button
+        className={"ctrl-track" + (on ? " on" : "")}
+        aria-pressed={on}
+        onClick={toggle}
+        title={on ? 'Stop face tracking' : 'Start face tracking'}
+      >
+        <span className="ctrl-track-dot" />
+        <em>{on ? 'TRACKING' : 'FACE'}</em>
+      </button>
     </div>
   );
 }
