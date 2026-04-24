@@ -140,6 +140,7 @@ function Icon({ name, size = 14 }) {
     case "swap":   return <svg {...common}><path d="M3 5h9l-2-2M13 11H4l2 2"/></svg>;
     case "play":   return <svg {...common}><path d="M5 3l8 5-8 5V3z" fill={stroke}/></svg>;
     case "pause":  return <svg {...common}><rect x="4" y="3" width="3" height="10"/><rect x="9" y="3" width="3" height="10"/></svg>;
+    case "skip":   return <svg {...common}><path d="M3 3l7 5-7 5V3z" fill={stroke} stroke="none"/><rect x="11" y="3" width="2" height="10" fill={stroke} stroke="none"/></svg>;
     case "log":    return <svg {...common}><path d="M3 3h10v10H3z"/><path d="M5 6h6M5 8h6M5 10h4"/></svg>;
     default: return null;
   }

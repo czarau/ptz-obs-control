@@ -20,17 +20,11 @@ const SLOT_BUCKETS = [
   { key: 'custom',   title: 'Custom',       slots: [20, 21, 22, 23],                    cols: 1, span: 1 },
 ];
 
-// Static queue placeholder — full auto-queue logic ported later.
-const AUTO_QUEUE = [
-  { label: "Lecturn · Speaker", slot: 0, t: 40 },
-  { label: "Wide · Piano",      slot: 4, t: 25 },
-  { label: "Piano · Keys",      slot: 6, t: 18 },
-  { label: "Choir · Front",     slot: 12, t: 12 },
-  { label: "Congregation",      slot: 16, t: 30 },
-  { label: "Lecturn · Speaker", slot: 0, t: 20 },
-  { label: "Singers · Wide",    slot: 15, t: 15 },
-  { label: "Cong · Back",       slot: 19, t: 22 },
-];
+// Auto queue lives in its own slot range (24-31) in the same flat presets[]
+// array. Each queue slot stores its own {camera, label, timeout}, completely
+// independent from the category columns — arming/going-live on a queue card
+// does NOT highlight any category card and vice versa.
+const QUEUE_SLOTS = [24, 25, 26, 27, 28, 29, 30, 31];
 
 const CAM_SCENE = { '1': 'Camera 1 - Back', '2': 'Camera 2 - Left', '3': 'Camera 3 - Right' };
 // Same direct-to-camera CGI hosts as live-feeds.jsx / chatswood/control_v2.js
@@ -230,14 +224,9 @@ function PresetColumn({ bucket, liveId, activeByCam, motionByCam, refreshMap, on
   );
 }
 
-// Find which SLOT_BUCKETS entry owns a given slot; fall back to a synthetic
-// "queue" bucket if the slot isn't mapped to a category.
-function bucketForSlot(slot) {
-  return SLOT_BUCKETS.find(b => b.slots.includes(slot))
-    || { key: 'queue', title: 'Queue', slots: [slot], cols: 1, span: 1 };
-}
+const QUEUE_BUCKET = { key: 'queue', title: 'Queue', slots: QUEUE_SLOTS, cols: 2, span: 2 };
 
-function AutoQueueColumn({ items, running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext }) {
+function AutoQueueColumn({ running, setRunning, advance, liveId, activeByCam, motionByCam, refreshMap, onThumbClick, onThumbContext }) {
   return (
     <div className="pcol pcol-queue" style={{ gridColumn: "span 2" }}>
       <div className="pcol-head pcol-head-queue">
@@ -247,36 +236,27 @@ function AutoQueueColumn({ items, running, setRunning, advance, liveId, activeBy
             <Icon name={running ? "pause" : "play"} size={12}/>
             <span>{running ? "Running" : "Paused"}</span>
           </button>
-          <button className="qbtn" onClick={advance}><Icon name="swap" size={12}/><span>Skip</span></button>
+          <button className="qbtn" onClick={advance}><Icon name="skip" size={12}/><span>Skip</span></button>
         </div>
       </div>
       <div className="pcol-grid" data-cols="2" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-        {items.map((q, i) => {
-          // Share the underlying preset slot id with the category column — so
-          // arming / going live on an auto-queue card highlights the same
-          // preset everywhere it appears. Display label overrides for the
-          // queue view only; the stored preset label is unchanged.
-          const ownerBucket = bucketForSlot(q.slot);
-          const id = `${ownerBucket.key}-${q.slot}`;
-          const underlying = presetFor(q.slot);
-          const display = { ...underlying, label: q.label };
-          const cam = String(underlying.camera);
+        {QUEUE_SLOTS.map((slot) => {
+          const p = presetFor(slot);
+          const id = `queue-${slot}`;
+          const cam = String(p.camera);
           const isActive = activeByCam[cam] === id;
           const isMotion = motionByCam[cam] === id;
-          // Mark the bucket as queue so the context menu's "Set Timeout"
-          // item is enabled on these cards.
-          const ctxBucket = { ...ownerBucket, key: 'queue' };
           return (
             <ThumbCard
-              key={i}
-              preset={display}
+              key={slot}
+              preset={p}
               onAir={liveId === id}
               selected={isActive && liveId !== id}
               inMotion={isMotion}
               refreshTs={refreshMap[id]}
-              queueBadge={q.t}
-              onClick={() => onThumbClick(id, underlying)}
-              onContextMenu={(e) => onThumbContext(e, id, underlying, ctxBucket)}
+              queueBadge={p.timeout}
+              onClick={() => onThumbClick(id, p)}
+              onContextMenu={(e) => onThumbContext(e, id, p, QUEUE_BUCKET)}
             />
           );
         })}
@@ -309,13 +289,14 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
     };
     // Live-feed "Update" sweep dispatches this per preset as it arrives.
     const onPresetRefresh = (e) => {
-      const cam = String(e.detail?.camera);
       const slot = e.detail?.slot;
       if (slot == null) return;
-      // Match the slot within any bucket; the id shape is "<bucketKey>-<slot>".
-      const id = SLOT_BUCKETS.find(b => b.slots.includes(slot));
-      if (!id) return;
-      const thumbId = `${id.key}-${slot}`;
+      // Find which view owns this slot — either a category bucket or the
+      // independent auto-queue range — and bump that thumb's cache-buster.
+      const bucket = SLOT_BUCKETS.find(b => b.slots.includes(slot))
+        || (QUEUE_SLOTS.includes(slot) ? { key: 'queue' } : null);
+      if (!bucket) return;
+      const thumbId = `${bucket.key}-${slot}`;
       setRefreshMap(m => ({ ...m, [thumbId]: Date.now() }));
     };
     window.addEventListener('ptz:manual-move', onManualMove);
@@ -451,7 +432,6 @@ function PresetGrid({ liveId, setLive, liveCamera, setLiveCamFromNumber, admin, 
         />
       ))}
       <AutoQueueColumn
-        items={AUTO_QUEUE}
         running={queueRunning}
         setRunning={setQueueRunning}
         advance={advanceQueue}
