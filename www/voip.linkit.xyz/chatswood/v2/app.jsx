@@ -94,9 +94,19 @@ function App() {
   // Take the currently cued scene to program. Switches OBS scene and
   // routes through onTakeSceneLive so the outgoing scene becomes the
   // next cue. No-op if nothing is cued.
+  //
+  // Special case for the data feed: when the operator has set the Slides
+  // preference (DataControls in live-feeds.jsx), we go to the
+  // 'DP & Speaker' composite scene instead of 'DP Full Screen'. This keeps
+  // the Slides button as a sticky preference — clicking the data feed
+  // honours that preference instead of always falling back to the
+  // slides-only scene (and silently flipping the Slides toggle off).
   const takeCuedScene = () => {
     if (!cuedSceneId) return;
-    const scene = SCENE_FOR_ID[cuedSceneId];
+    let scene = SCENE_FOR_ID[cuedSceneId];
+    if (cuedSceneId === 'data' && window.LS_SLIDES) {
+      scene = 'DP & Speaker';
+    }
     if (window.OBS && scene) window.OBS.switchScene(scene).catch(() => {});
     window.Log?.add('live', `LIVE → ${cuedSceneId.toUpperCase()}`, scene);
     onTakeSceneLive(cuedSceneId);

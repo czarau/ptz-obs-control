@@ -225,29 +225,43 @@
 
     echo json_encode($preset);
   }
-  elseif ($_GET['cmd'] == 'set_home')
+  elseif ($_GET['cmd'] == 'set_home_abs')
   {
-    // Flag a preset slot as the "home" for a camera. The Home button in the
-    // UI calls poscall on that slot instead of the factory home.
-    //   ?cmd=set_home&user=<id>&camera=<n>&slot=<slot>
+    // Save the camera's current absolute pan/tilt/zoom/focus as that
+    // camera's home position. Right-clicking the HOME joystick button
+    // captures the current PTZ values and posts them here. The HOME
+    // button's onClick reads home_abs and falls back to the factory home
+    // CGI when no entry exists.
+    //   ?cmd=set_home_abs&user=<id>&camera=<n>&pan=&tilt=&zoom=&focus=
     $settingsfile = ($_GET['user'] == 'shccc')
       ? ".data/settings-shccc.json"
       : ".data/settings.json";
 
-    if (!is_numeric($_GET['camera']) || !is_numeric($_GET['slot'])) die;
-    $cam  = (string)((int)$_GET['camera']);
-    $slot = (int)$_GET['slot'];
+    if (!is_numeric($_GET['camera'])) die;
+    $cam = (string)((int)$_GET['camera']);
 
     $settings = json_decode(file_get_contents($settingsfile), true) ?: [];
-    if (!isset($settings['home']) || !is_array($settings['home'])) {
-      $settings['home'] = [];
+    if (!isset($settings['home_abs']) || !is_array($settings['home_abs'])) {
+      $settings['home_abs'] = [];
     }
-    $settings['home'][$cam] = $slot;
+    $entry = $settings['home_abs'][$cam] ?? [];
+    foreach (['pan', 'tilt', 'zoom', 'focus'] as $k) {
+      if (isset($_GET[$k]) && is_numeric($_GET[$k])) {
+        $entry[$k] = (int)$_GET[$k];
+      }
+    }
+    if (!isset($entry['pan']) || !isset($entry['tilt'])) {
+      header('Content-Type: application/json');
+      http_response_code(400);
+      echo json_encode(['error' => 'pan and tilt required']);
+      die;
+    }
+    $settings['home_abs'][$cam] = $entry;
 
     $json = json_encode($settings, JSON_PRETTY_PRINT);
     file_put_contents($settingsfile, $json);
     header('Content-Type: application/json');
-    echo json_encode(['ok' => true, 'home' => $settings['home']]);
+    echo json_encode(['ok' => true, 'home_abs' => $settings['home_abs']]);
   }
   elseif ($_GET['cmd'] == 'save_thumb')
   {

@@ -233,32 +233,6 @@ const PRESET_ACTIONS = {
     window.Log?.add('system', `Set timeout · ${preset.label} → ${secs}s`);
   },
 
-  // Flag this preset as the Home position for its camera. The Home button
-  // on that camera's PTZ pad will then recall this preset instead of calling
-  // the factory home.
-  saveAsHome(preset) {
-    const cam = Number(preset.camera);
-    const params = new URLSearchParams({
-      cmd: 'set_home',
-      user: PRESET_ACTIONS.user(),
-      camera: String(cam),
-      slot: String(preset.slot),
-      ts: String(Date.now()),
-    });
-    fetch(`${PRESET_ACTIONS.endpoint()}?${params}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        // Update the in-memory cache so the Home button picks it up immediately.
-        if (!window.LS_CONFIG) return;
-        if (!window.LS_CONFIG.home || typeof window.LS_CONFIG.home !== 'object') {
-          window.LS_CONFIG.home = {};
-        }
-        window.LS_CONFIG.home[String(cam)] = preset.slot;
-        window.Log?.add('system', `Home set · Cam ${cam}`, preset.label || `slot ${preset.slot}`);
-      })
-      .catch(() => {});
-  },
-
   async getAdminPreset(preset) {
     const url = `${PRESET_ACTIONS.endpoint()}?cmd=get_preset&user=${PRESET_ACTIONS.user()}&admin=1&id=${preset.slot}&ts=${Date.now()}`;
     try {
@@ -334,7 +308,55 @@ const PRESET_ACTIONS = {
 const MIME_CAMERA = 'application/x-ls-camera';       // live-feed → preset (capture live PTZ)
 const MIME_PRESET = 'application/x-ls-preset-slot';  // preset   → preset (copy saved values)
 
-function ThumbCard({ preset, id, onAir, selected, inMotion, liveWarn, refreshTs, compact, onClick, onContextMenu, onDropCamera, onDropPreset, queueBadge }) {
+// Painted on top of <Thumb> when this thumb is the active (parked) preset
+// on its camera. Pulls a frame from window.LIVE_VIDEOS[<cam>] once per
+// second so the operator sees what the camera is actually looking at right
+// now, no server round-trip. The server-side thumbs/<id>.jpg cache is only
+// rewritten right before a move (capturePresetThumb in live-feeds.jsx) so
+// the on-disk copy stays a faithful "last view at this preset" snapshot.
+function LiveThumbOverlay({ camera }) {
+  const canvasRef = useRefPG(null);
+  useEffectPG(() => {
+    if (!camera || camera < 1 || camera > 3) return;
+    let alive = true;
+    const draw = () => {
+      if (!alive) return;
+      const video = (window.LIVE_VIDEOS || {})[camera];
+      const canvas = canvasRef.current;
+      if (!video || !video.videoWidth || !canvas) return;
+      // Lazily size the canvas to the source aspect on first frame so the
+      // drawn image isn't stretched.
+      if (canvas.width !== 480) {
+        canvas.width  = 480;
+        canvas.height = Math.round(480 * video.videoHeight / video.videoWidth) || 270;
+      }
+      try {
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      } catch (_) { /* video not yet ready / drawn from another origin — ignore */ }
+    };
+    draw();                                  // immediate first paint
+    const id = setInterval(draw, 1000);      // ~1 Hz refresh
+    return () => { alive = false; clearInterval(id); };
+  }, [camera]);
+
+  // The canvas sits absolutely on top of the server <Thumb>. While it has
+  // not painted yet (camera just went active, video not ready) it's
+  // transparent so the underlying server thumb shows through — no flash.
+  return (
+    <canvas
+      ref={canvasRef}
+      className="thumb-live-canvas"
+      style={{
+        position: 'absolute', inset: 0,
+        width: '100%', height: '100%',
+        objectFit: 'cover', display: 'block',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+function ThumbCard({ preset, id, onAir, selected, inMotion, liveWarn, refreshTs, compact, liveSourceCam, onClick, onContextMenu, onDropCamera, onDropPreset, queueBadge }) {
   const [dragOver, setDragOver] = useStatePG(false);
 
   // Only presets with saved abs values make sense as a drag SOURCE — there's
@@ -408,8 +430,9 @@ function ThumbCard({ preset, id, onAir, selected, inMotion, liveWarn, refreshTs,
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="thumb-img">
+      <div className="thumb-img" style={{ position: 'relative' }}>
         <Thumb presetId={preset.presetId} camera={preset.camera} fresh={!!refreshTs} ts={refreshTs} />
+        {liveSourceCam ? <LiveThumbOverlay camera={liveSourceCam} /> : null}
         {onAir && <span className="thumb-livebadge">LIVE</span>}
         {selected && !onAir && <span className="thumb-cuebadge">CUE</span>}
         {queueBadge != null && <span className="thumb-timer">{queueBadge}s</span>}
@@ -455,6 +478,11 @@ function PresetColumn({ bucket, liveId, liveCameraNum, activeByCam, motionByCam,
               inMotion={isMotion}
               liveWarn={liveWarn}
               refreshTs={refreshMap[id]}
+              // Active (parked) thumbs render a 1 Hz WebRTC overlay so the
+              // displayed frame matches what the camera is actually looking
+              // at now. Suppressed during a transit so the in-motion amber
+              // animation reads cleanly.
+              liveSourceCam={(isActive && !isMotion) ? Number(p.camera) : 0}
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, bucket)}
               onDropCamera={(cam) => onThumbDrop(id, p, cam)}
@@ -508,6 +536,7 @@ function AutoQueueColumn({ running, setRunning, advance, liveId, liveCameraNum, 
               liveWarn={liveWarn}
               refreshTs={refreshMap[id]}
               queueBadge={badge}
+              liveSourceCam={(isActive && !isMotion) ? Number(p.camera) : 0}
               onClick={() => onThumbClick(id, p)}
               onContextMenu={(e) => onThumbContext(e, id, p, QUEUE_BUCKET)}
               onDropCamera={(cam) => onThumbDrop(id, p, cam)}
@@ -909,15 +938,10 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     const ICO = (name) => <Icon name={name} size={13}/>;
     // Save-from-live and per-camera save buttons removed — the drag-drop
     // flow (drag a live feed onto a thumb, or drag one thumb onto another
-    // to copy) fully replaces them. Home is kept because it assigns a
-    // semantic role to the preset slot that drag-drop can't express.
+    // to copy) fully replaces them. The slot-based Home was also removed:
+    // each camera's home is now a standalone abs position captured by
+    // right-clicking the HOME button on its PTZ pad (see live-feeds.jsx).
     const items = [
-      {
-        label: 'Save as Home',
-        icon: ICO('home'),
-        onClick: () => PRESET_ACTIONS.saveAsHome(preset),
-      },
-      { separator: true },
       {
         label: 'Rename',
         icon: ICO('edit'),
@@ -950,10 +974,16 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       { separator: true },
       { label: 'Restore Default', icon: ICO('rotate'), onClick: () => { PRESET_ACTIONS.restoreDefault(preset).then(bumpThumb); } },
       {
+        // Captures whatever the preset's camera is currently looking at and
+        // stores it in the admin/default bank for this slot. Doesn't require
+        // the thumb to be already armed — that would be the wrong gate,
+        // since the whole point of "save default" is to replace the stored
+        // position with the current camera position. Admin mode alone is
+        // the gate.
         label: 'Save as Default',
         icon: ICO('save'),
-        disabled: !admin || !isArmed,
-        onClick: () => PRESET_ACTIONS.savePosition(preset, Number(preset.camera), { admin: true }),
+        disabled: !admin,
+        onClick: () => PRESET_ACTIONS.savePosition(preset, Number(preset.camera), { admin: true }).then(bumpThumb),
       },
     ];
     menu.open(e, items);

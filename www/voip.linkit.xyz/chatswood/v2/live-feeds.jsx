@@ -289,7 +289,7 @@ function LiveFeed({ cam, onAir, cued, onClick, onContextMenu, ptzSpeed }) {
         )}
       </button>
       {!cam.isData && <PTZPad camera={cam.camera} ptzSpeed={ptzSpeed} />}
-      {cam.isData && <DataControls />}
+      {cam.isData && <DataControls dataLive={onAir} />}
     </div>
   );
 }
@@ -313,6 +313,56 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
   // Scale 1-10 UI speed → 1-24 camera range (pan/tilt) and 1-7 (zoom/focus)
   const panSpeed  = Math.max(1, Math.min(24, Math.round(ptzSpeed * 2.4)));
   const zoomSpeed = Math.max(1, Math.min(7, Math.round(ptzSpeed * 0.7)));
+
+  // Right-click on the HOME button captures the camera's current pan/tilt/
+  // zoom/focus as that camera's home position. Each PTZPad has its own
+  // context-menu hook / <ContextMenu> render so the popup anchors to the
+  // pad the operator right-clicked. There's no "clear" — overwrite by
+  // re-saving from a different position.
+  const homeMenu = useContextMenu();
+
+  const saveHomeAbs = async () => {
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+    const user = (window.LS_CONFIG || {}).user || 'chatswood';
+    const pos = await (window.PTZState?.query(camera) || Promise.resolve(null));
+    if (!pos) {
+      window.Log?.add('error', `Save Home · could not read Cam ${camera} position`);
+      return;
+    }
+    const params = new URLSearchParams({
+      cmd: 'set_home_abs',
+      user,
+      camera: String(camera),
+      pan:   String(pos.pan),
+      tilt:  String(pos.tilt),
+      zoom:  String(pos.zoom),
+      focus: String(pos.focus),
+      ts:    String(Date.now()),
+    });
+    try { await fetch(`${endpoint}?${params}`); } catch (_) {}
+    if (!window.LS_CONFIG) window.LS_CONFIG = {};
+    if (!window.LS_CONFIG.homeAbs || typeof window.LS_CONFIG.homeAbs !== 'object') {
+      window.LS_CONFIG.homeAbs = {};
+    }
+    window.LS_CONFIG.homeAbs[String(camera)] = {
+      pan: pos.pan, tilt: pos.tilt, zoom: pos.zoom, focus: pos.focus,
+    };
+    window.Log?.add(
+      'camera',
+      `Save Home · Cam ${camera}`,
+      `p=${pos.pan} t=${pos.tilt} z=${pos.zoom} f=${pos.focus}`
+    );
+  };
+
+  const onHomeContext = (e) => {
+    homeMenu.open(e, [
+      {
+        label: 'Save Home (current position)',
+        icon: <Icon name="save" size={13}/>,
+        onClick: saveHomeAbs,
+      },
+    ]);
+  };
 
   const start = (direction) => {
     const s = `${panSpeed}&${panSpeed}`;
@@ -371,37 +421,36 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
           <button className="joy-arrow joy-b"  aria-label="Tilt down"     {...pan('b')}><Arrow d="b"/></button>
           <button className="joy-arrow joy-bl" aria-label="Pan down-left" {...pan('bl')}><Arrow d="bl"/></button>
           <button className="joy-arrow joy-l"  aria-label="Pan left"      {...pan('l')}><Arrow d="l"/></button>
-          {/* HOME + joy arrows — track toggle sits below this ring */}
-          <button className="joy-center" aria-label="Home" onClick={() => {
-            // If the user has flagged a preset as this camera's Home via the
-            // preset context menu, recall that preset. Otherwise fall back to
-            // the camera's factory home.
-            const home = (window.LS_CONFIG?.home || {})[String(camera)];
-            if (home != null) {
-              // Prefer the abs position saved with the preset — survives
-              // firmware wipes. Fall back to the camera's onboard slot
-              // recall if the preset hasn't been re-saved yet.
-              const raw = (window.LS_CONFIG?.presets || [])[Number(home)];
-              const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
-              if (raw && raw.pan != null && raw.tilt != null) {
+          {/* HOME + joy arrows — track toggle sits below this ring.
+            * Right-click captures the current PTZ position as this camera's
+            * home (see saveHomeAbs above). Left-click drives the camera to
+            * the saved home_abs position, or to the factory home if no
+            * home_abs has been captured yet. */}
+          <button
+            className="joy-center"
+            aria-label="Home"
+            onContextMenu={onHomeContext}
+            onClick={() => {
+              const homeAbs = (window.LS_CONFIG?.homeAbs || {})[String(camera)];
+              if (homeAbs && homeAbs.pan != null && homeAbs.tilt != null) {
+                const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
                 const params = new URLSearchParams({
                   cmd: 'goto_abs',
                   camera: String(camera),
-                  pan:   String(raw.pan),
-                  tilt:  String(raw.tilt),
+                  pan:   String(homeAbs.pan),
+                  tilt:  String(homeAbs.tilt),
                 });
-                if (raw.zoom  != null) params.set('zoom',  String(raw.zoom));
-                if (raw.focus != null) params.set('focus', String(raw.focus));
+                if (homeAbs.zoom  != null) params.set('zoom',  String(homeAbs.zoom));
+                if (homeAbs.focus != null) params.set('focus', String(homeAbs.focus));
                 fetch(`${endpoint}?${params}`).catch(() => {});
+                window.Log?.add('camera', `Home · Cam ${camera}`,
+                  `p=${homeAbs.pan} t=${homeAbs.tilt} z=${homeAbs.zoom ?? '—'} f=${homeAbs.focus ?? '—'}`);
               } else {
-                const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + Number(home);
-                ptzCmd(camera, `poscall&${presetId}`);
+                ptzCmd(camera, 'home');
+                window.Log?.add('camera', `Home · Cam ${camera}`, 'factory home (no saved position)');
               }
-              window.Log?.add('camera', `Home · Cam ${camera}`, `slot ${home}`);
-            } else {
-              ptzCmd(camera, 'home');
-            }
-          }}>
+            }}
+          >
             <span className="joy-center-dot" />
             <span className="joy-center-label">HOME</span>
           </button>
@@ -425,6 +474,7 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
           <button className="ctrl-auto" aria-label="Auto focus" onClick={() => focusCmd(camera, 'focus_auto')}>AUTO</button>
         </div>
       </div>
+      <ContextMenu state={homeMenu.state} onClose={homeMenu.close} />
     </div>
   );
 }
@@ -487,17 +537,35 @@ function Arrow({ d }) {
   );
 }
 
-function DataControls() {
+function DataControls({ dataLive }) {
   const [overlay, setOverlayState] = useStateLF(null); // 'dp' | 'l3rd' | null
-  const [slides, setSlides] = useStateLF(false);
+  // Slides is a *sticky preference* — not a live reflection of the current
+  // OBS scene. When ON, taking the data feed live switches OBS to the
+  // 'DP & Speaker' composite; when OFF, to 'DP Full Screen'. Toggling Slides
+  // while data isn't live just updates the preference; the next take of
+  // data picks the right scene. (Previously a 5s OBS poll forced this back
+  // to false whenever a camera was on program, which meant clicking the
+  // data feed always went to 'DP Full Screen' and silently turned Slides
+  // off — the bug this replaces.)
+  const [slides, setSlidesRaw] = useStateLF(!!window.LS_SLIDES);
 
-  // Sync with OBS on mount + every 5s so external changes are reflected.
+  // Mirror to window so app.jsx's takeCuedScene can read the preference
+  // when picking which data scene to switch to. (DataControls is buried
+  // several layers deep, so a shared global is cheaper than threading
+  // state up to App.)
+  const setSlides = (v) => {
+    window.LS_SLIDES = v;
+    setSlidesRaw(v);
+  };
+  useEffectLF(() => { window.LS_SLIDES = slides; }, []); // initialize on mount
+
+  // Overlay sync still polls OBS — overlays are a true reflection of the
+  // current scene's source visibility and have no preference semantics.
   useEffectLF(() => {
     if (!window.OBS) return;
     let alive = true;
     const sync = () => {
       window.OBS.currentOverlay().then(kind => { if (alive) setOverlayState(kind); }).catch(() => {});
-      window.OBS.currentScene().then(scene => { if (alive) setSlides(scene === 'DP & Speaker'); }).catch(() => {});
     };
     sync();
     const id = setInterval(sync, 5000);
@@ -511,15 +579,21 @@ function DataControls() {
     window.Log?.add('live', next ? `Overlay → ${next === 'dp' ? 'DP' : 'Lower Third'}` : 'Overlay off');
   };
 
-  // Slides flips the Data Projection live scene between "DP Full Screen"
-  // (the default, just the slides) and "DP & Speaker" (composite scene
-  // that keeps a speaker shot next to the slides).
+  // Slides toggle:
+  //   - update the sticky preference always
+  //   - switch OBS scene only if data is currently live (otherwise the
+  //     preference will be applied next time data is taken)
   const toggleSlides = () => {
     const next = !slides;
-    setSlides(next); // optimistic
-    const target = next ? 'DP & Speaker' : 'DP Full Screen';
-    if (window.OBS) window.OBS.switchScene(target).catch(() => {});
-    window.Log?.add('live', `Slides ${next ? 'ON' : 'OFF'} → ${target}`);
+    setSlides(next);
+    if (dataLive) {
+      const target = next ? 'DP & Speaker' : 'DP Full Screen';
+      if (window.OBS) window.OBS.switchScene(target).catch(() => {});
+      window.Log?.add('live', `Slides ${next ? 'ON' : 'OFF'} → ${target}`);
+    } else {
+      window.Log?.add('live', `Slides preference ${next ? 'ON' : 'OFF'}`,
+        next ? 'next take of data → DP & Speaker' : 'next take of data → DP Full Screen');
+    }
   };
 
   return (

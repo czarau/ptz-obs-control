@@ -7,7 +7,7 @@
   // running stale code indefinitely — e.g. a preset-grid missing the
   // goto_abs path keeps firing poscall on a firmware-wiped camera. Bump this
   // whenever you ship a change to any asset in this directory.
-  $ASSET_VER = '28';
+  $ASSET_VER = '32';
 
   $dataDir = __DIR__ . '/../.data';
   $user = (isset($_GET['id']) && $_GET['id'] === 'shccc') ? 'shccc' : 'chatswood';
@@ -61,7 +61,7 @@
       presetStartIndex: <?= (int)($settings['preset_start_index'] ?? 100) ?>,
       presetAdminIndex: <?= (int)($settings['preset_admin_index'] ?? 150) ?>,
       presets:          <?= json_encode($settings['presets'] ?? []) ?>,
-      home:             <?= json_encode($settings['home'] ?? (object)[]) ?>,
+      homeAbs:          <?= json_encode($settings['home_abs'] ?? (object)[]) ?>,
       buckets:          <?= json_encode($buckets) ?>,
       queueSlots:       <?= json_encode($queueSlots) ?>,
       thumbEndpoint:    "../control_thumb.php",

@@ -4,267 +4,545 @@
     "presets": [
         {
             "camera": "1",
-            "label": "Lecturn"
+            "label": "Lecturn",
+            "pan": 33,
+            "tilt": -86,
+            "zoom": 14175,
+            "focus": 621
         },
         {
             "camera": "1",
-            "label": "Wide"
+            "label": "Wide",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 10337,
+            "focus": 645
         },
         {
             "camera": "2",
-            "label": "Left"
+            "label": "Left",
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7700,
+            "focus": 997
         },
         {
             "camera": "3",
-            "label": "Right"
-        },
-        {
-            "camera": "3",
-            "label": "Wide"
-        },
-        {
-            "camera": "3",
-            "label": "Preset"
-        },
-        {
-            "camera": "2",
-            "label": "Left"
-        },
-        {
-            "camera": "2",
-            "label": "Preset"
+            "label": "Right",
+            "pan": -92,
+            "tilt": -306,
+            "zoom": 4967,
+            "focus": 1291
         },
         {
             "camera": "1",
-            "label": "Front"
-        },
-        {
-            "camera": "1",
-            "label": "Preset"
-        },
-        {
-            "camera": "1",
-            "label": "Back"
-        },
-        {
-            "camera": "2",
-            "label": "Preset"
-        },
-        {
-            "camera": "1",
-            "label": "Front"
-        },
-        {
-            "camera": "1",
-            "label": "Wide"
-        },
-        {
-            "camera": "2",
-            "label": "Left"
-        },
-        {
-            "camera": "3",
-            "label": "Right"
-        },
-        {
-            "camera": "3",
-            "label": "Right"
-        },
-        {
-            "camera": "2",
-            "label": "Left"
-        },
-        {
-            "camera": "1",
-            "label": "Front"
-        },
-        {
-            "camera": "1",
-            "label": "Wide"
-        },
-        {
-            "camera": "1",
-            "label": "Custom 1"
-        },
-        {
-            "camera": "3",
-            "label": "Custom 2"
-        },
-        {
-            "camera": "2",
-            "label": "Custom 3"
-        },
-        {
-            "camera": "1",
-            "label": "Sabbath School"
+            "label": "Piano",
+            "pan": -86,
+            "tilt": -87,
+            "zoom": 15152,
+            "focus": 1084
         },
         {
             "camera": "1",
             "label": "Preset",
-            "timeout": "20"
-        },
-        {
-            "camera": "3",
-            "label": "Preset",
-            "timeout": "8"
-        },
-        {
-            "camera": "1",
-            "label": "Preset",
-            "timeout": "20"
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14248,
+            "focus": 634
         },
         {
             "camera": "2",
-            "label": "Preset"
+            "label": "Left",
+            "pan": -825,
+            "tilt": -304,
+            "zoom": 10003,
+            "focus": 725
+        },
+        {
+            "camera": "2",
+            "label": "Keys",
+            "pan": -800,
+            "tilt": -323,
+            "zoom": 13028,
+            "focus": 539
         },
         {
             "camera": "1",
-            "label": "Preset",
-            "timeout": "15"
+            "label": "Front",
+            "pan": -81,
+            "tilt": -93,
+            "zoom": 15076,
+            "focus": 1028
         },
         {
             "camera": "3",
             "label": "Preset",
-            "timeout": "6"
+            "pan": 150,
+            "tilt": -215,
+            "zoom": 12843,
+            "focus": 474
+        },
+        {
+            "camera": "2",
+            "label": "Back",
+            "pan": -825,
+            "tilt": -304,
+            "zoom": 6083,
+            "focus": 1178
+        },
+        {
+            "camera": "2",
+            "label": "Preset",
+            "pan": -555,
+            "tilt": -213,
+            "zoom": 10637,
+            "focus": 650
+        },
+        {
+            "camera": "1",
+            "label": "Front",
+            "pan": 106,
+            "tilt": -86,
+            "zoom": 12955,
+            "focus": 592
+        },
+        {
+            "camera": "2",
+            "label": "piano",
+            "pan": -516,
+            "tilt": -249,
+            "zoom": 5892,
+            "focus": 1197
+        },
+        {
+            "camera": "3",
+            "label": "Left",
+            "pan": 588,
+            "tilt": -350,
+            "zoom": 2852,
+            "focus": 1484
+        },
+        {
+            "camera": "2",
+            "label": "Right",
+            "pan": -495,
+            "tilt": -149,
+            "zoom": 6423,
+            "focus": 1138
+        },
+        {
+            "camera": "3",
+            "label": "Right",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1243
+        },
+        {
+            "camera": "2",
+            "label": "Left",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1406
+        },
+        {
+            "camera": "1",
+            "label": "Front",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 6189,
+            "focus": 1124
+        },
+        {
+            "camera": "1",
+            "label": "Wide",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 0,
+            "focus": 1641
+        },
+        {
+            "camera": "1",
+            "label": "Custom 1",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 5989,
+            "focus": 1145
+        },
+        {
+            "camera": "2",
+            "label": "Custom 2",
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7700,
+            "focus": 998
+        },
+        {
+            "camera": "1",
+            "label": "Custom 3",
+            "pan": 33,
+            "tilt": -86,
+            "zoom": 12588,
+            "focus": 451
+        },
+        {
+            "camera": "2",
+            "label": "Custom 4",
+            "pan": 43,
+            "tilt": -52,
+            "zoom": 10689,
+            "focus": 639
         },
         {
             "camera": "1",
             "label": "Preset",
-            "timeout": "15"
+            "timeout": "40",
+            "pan": 33,
+            "tilt": -81,
+            "zoom": 13347,
+            "focus": 470
         },
         {
             "camera": "3",
-            "label": "Preset"
+            "label": "Preset",
+            "timeout": "25",
+            "pan": -160,
+            "tilt": -274,
+            "zoom": 6083,
+            "focus": 1179
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "30",
+            "pan": 33,
+            "tilt": -75,
+            "zoom": 12485,
+            "focus": 454
+        },
+        {
+            "camera": "2",
+            "label": "Preset",
+            "timeout": "25",
+            "pan": -369,
+            "tilt": -181,
+            "zoom": 10316,
+            "focus": 625
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "40",
+            "pan": 33,
+            "tilt": -81,
+            "zoom": 13347,
+            "focus": 470
+        },
+        {
+            "camera": "3",
+            "label": "Preset",
+            "timeout": "25",
+            "pan": -176,
+            "tilt": -274,
+            "zoom": 6705,
+            "focus": 1111
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "timeout": "40",
+            "pan": 33,
+            "tilt": -75,
+            "zoom": 11362,
+            "focus": 529
+        },
+        {
+            "camera": "2",
+            "label": "Preset",
+            "timeout": "20",
+            "pan": -369,
+            "tilt": -181,
+            "zoom": 10316,
+            "focus": 625
         }
     ],
     "presets_admin": [
         {
             "camera": "1",
-            "label": "Lecturn"
+            "label": "Lecturn",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 6186,
+            "focus": 1122
         },
         {
             "camera": "1",
-            "label": "Wide"
+            "label": "Wide",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 6186,
+            "focus": 1122
         },
         {
             "camera": "2",
-            "label": "Left"
+            "label": "Left",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "3",
-            "label": "Right"
+            "label": "Right",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1242
         },
         {
-            "camera": "3",
-            "label": "Wide"
+            "camera": "1",
+            "label": "Piano",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 6186,
+            "focus": 1122
         },
         {
-            "camera": "3",
-            "label": "Preset"
+            "camera": "1",
+            "label": "Preset",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 637
         },
         {
             "camera": "2",
-            "label": "Left"
+            "label": "Left",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "2",
-            "label": "Preset"
+            "label": "Keys",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "1",
-            "label": "Front"
+            "label": "Front",
+            "pan": 38,
+            "tilt": -86,
+            "zoom": 6186,
+            "focus": 1122
         },
         {
-            "camera": "1",
-            "label": "Preset"
-        },
-        {
-            "camera": "1",
-            "label": "Back"
+            "camera": "3",
+            "label": "Preset",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1243
         },
         {
             "camera": "2",
-            "label": "Preset"
-        },
-        {
-            "camera": "1",
-            "label": "Front"
-        },
-        {
-            "camera": "1",
-            "label": "Wide"
+            "label": "Back",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "2",
-            "label": "Left"
+            "label": "Preset",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
-            "camera": "3",
-            "label": "Right"
-        },
-        {
-            "camera": "3",
-            "label": "Right"
+            "camera": "1",
+            "label": "Front",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 637
         },
         {
             "camera": "2",
-            "label": "Left"
-        },
-        {
-            "camera": "1",
-            "label": "Front"
-        },
-        {
-            "camera": "1",
-            "label": "Wide"
-        },
-        {
-            "camera": "1",
-            "label": "Custom 1"
+            "label": "piano",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "3",
-            "label": "Custom 2"
+            "label": "Left",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1243
         },
         {
             "camera": "2",
-            "label": "Custom 3"
-        },
-        {
-            "camera": "1",
-            "label": "Sabbath School"
-        },
-        {
-            "camera": "1",
-            "label": "Preset"
+            "label": "Right",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "3",
-            "label": "Preset"
-        },
-        {
-            "camera": "1",
-            "label": "Preset"
+            "label": "Right",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1243
         },
         {
             "camera": "2",
-            "label": "Preset"
+            "label": "Left",
+            "pan": 443,
+            "tilt": -304,
+            "zoom": 3711,
+            "focus": 1405
         },
         {
             "camera": "1",
-            "label": "Preset"
-        },
-        {
-            "camera": "3",
-            "label": "Preset"
+            "label": "Front",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
         },
         {
             "camera": "1",
-            "label": "Preset"
+            "label": "Wide",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
+        },
+        {
+            "camera": "1",
+            "label": "Custom 1",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
+        },
+        {
+            "camera": "2",
+            "label": "Custom 2",
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7697,
+            "focus": 999
+        },
+        {
+            "camera": "1",
+            "label": "Custom 3",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
+        },
+        {
+            "camera": "2",
+            "label": "Custom 4",
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7697,
+            "focus": 998
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
         },
         {
             "camera": "3",
-            "label": "Preset"
+            "label": "Preset",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1243
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
+        },
+        {
+            "camera": "2",
+            "label": "Preset",
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7697,
+            "focus": 998
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
+        },
+        {
+            "camera": "3",
+            "label": "Preset",
+            "pan": -621,
+            "tilt": -296,
+            "zoom": 5464,
+            "focus": 1243
+        },
+        {
+            "camera": "1",
+            "label": "Preset",
+            "pan": -81,
+            "tilt": -86,
+            "zoom": 14245,
+            "focus": 638
+        },
+        {
+            "camera": "2",
+            "label": "Preset",
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7697,
+            "focus": 997
         }
-    ]
+    ],
+    "home_abs": {
+        "1": {
+            "pan": 33,
+            "tilt": -86,
+            "zoom": 14172,
+            "focus": 618
+        },
+        "2": {
+            "pan": -354,
+            "tilt": -211,
+            "zoom": 7697,
+            "focus": 998
+        },
+        "3": {
+            "pan": -99,
+            "tilt": -296,
+            "zoom": 5570,
+            "focus": 1233
+        }
+    }
 }
