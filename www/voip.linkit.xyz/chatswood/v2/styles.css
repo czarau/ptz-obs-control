@@ -395,8 +395,22 @@ em { font-style: normal; }
 .feed-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surf-2); }
 .feed-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .feed-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text); }
+/* The right side of the head swaps between three elements depending on state
+ * (hint / CUE badge / LIVE indicator). They have different intrinsic heights
+ * — the CUE badge has 1px×2 vertical padding, the LIVE indicator wraps a 7px
+ * dot, and the plain hint span is just text — so without normalising them
+ * the header gains/loses a couple of pixels on state change and the video
+ * below shifts. Locking them to a common inline-flex layout + min-height
+ * keeps the head a fixed size across all three states. */
+.feed-hint,
+.feed-cuebadge,
+.feed-live {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+}
 .feed-hint { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
-.feed-live { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--onair); }
+.feed-live { gap: 5px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--onair); }
 .feed-live > span { width: 7px; height: 7px; border-radius: 999px; background: var(--onair); animation: pulse 1.2s ease-in-out infinite; }
 
 .feed-img { position: relative; background: #000; display: block; overflow: hidden; width: 100%; aspect-ratio: 16 / 9; flex: 0 0 auto; }
