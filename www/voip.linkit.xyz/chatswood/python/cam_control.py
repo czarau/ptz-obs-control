@@ -11,11 +11,19 @@ class CameraPTZOptics:
         self._location = (ip, port)
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # TCP
         self._sock.connect((ip, port))
-        #self._sock.settimeout(0.1)
-        self._sock.settimeout(20)
+        # 2 s recv timeout. Was 20 s, which combined with num_retries=10 meant
+        # a camera that went silent during a long zoom could hold the script
+        # for 200 s in the worst case — and a single 20 s timeout was the
+        # direct cause of the 22 s "Arrived" hang the operator hit. PTZOptics
+        # acknowledges every command in <100 ms when responsive; if it hasn't
+        # acknowledged in 2 s it isn't going to.
+        self._sock.settimeout(2)
 
         self.num_missed_responses = 0
-        self.num_retries = 10
+        # 2 retries (was 10). Resending the same VISCA command after a timeout
+        # is rarely useful and can confuse the camera's command buffer; fail
+        # fast and let the JS layer's settle loop decide whether to re-poll.
+        self.num_retries = 2
 
     def _send_command(self, command_hex: str, query=False) -> Optional[bytes]:
         payload_type = b'\x01\x00'
@@ -29,21 +37,26 @@ class CameraPTZOptics:
         for retry_num in range(self.num_retries):
 
             message = preamble + bytearray.fromhex(command_hex) + terminator
-            self._sock.sendall(message)
-
             try:
+                self._sock.sendall(message)
                 response = self._receive_response()
-            except ViscaException as exc:
+            except (socket.timeout, OSError) as exc:
+                # socket.timeout is the recv-side timeout (recv slot); OSError
+                # covers send-side failures (broken pipe if the camera dropped
+                # the connection mid-move). Either way, retry up to
+                # num_retries before giving up. NB: the original code had
+                # `except ViscaException` which referenced an undefined name —
+                # any non-timeout error inside the socket call would have
+                # raised NameError instead of the real cause.
                 exception = exc
-            else:
-                if response is not None:
-                    return response
-                elif not query:
-                    return None
+                continue
+            if response is not None:
+                return response
+            if not query:
+                return None
         if exception:
             raise exception
-        else:
-            raise exception(f'Could not get a response after {self.num_retries} tries')
+        raise RuntimeError(f'Could not get a response after {self.num_retries} tries')
 
     def _receive_response(self) -> Optional[bytes]:
         ilen = 0
@@ -59,19 +72,26 @@ class CameraPTZOptics:
                     if len(response) == 3 and response[0] == 0x90 and response[1] >= 0x40 and response[1] <= 0x4f and response[2] == 0xff:
                         #print("CMD ACKNOWLEDGED")
                         response = b''
-                    elif len(response) == 3 and response[0] ==0x90 and response[1] >= 0x50 and response[1] <= 0x5f and response[2] == 0xff:
-                        #print("CMD COMPLETE")                          
+                    elif len(response) == 3 and response[0] == 0x90 and response[1] >= 0x50 and response[1] <= 0x5f and response[2] == 0xff:
+                        #print("CMD COMPLETE")
                         return 'COMPLETE'
-                    elif len(response) == 3 and response[0] ==0x90 and response[1] >= 0x60 and response[1] <= 0x6f and response[2] == 0xff:
-                        print(f"CMD ERROR!!: {len(response)} {response!r}") 
-                        return 'ERROR'
-                        # 90 60 02 FF SYNTAX_ERROR
-                        # 90 60 03 FF Command Buffer Full
-                        # 90 60 04 FF Command Canceled
-                        # 90 6y 05 FF No Socket 
-                        # 90 6y 41 FF Command Not Executable                        
+                    elif len(response) == 4 and response[0] == 0x90 and 0x60 <= response[1] <= 0x6f and response[3] == 0xff:
+                        # VISCA error frame: 90 6y SS FF — 4 bytes including
+                        # the error-code byte. Was being checked at length==3
+                        # which never matched (because the 4th byte is FF, not
+                        # the error code), so error frames fell through to
+                        # "return raw bytes" and the PHP/JS layer had to wrap
+                        # everything in _jsonable() to keep JSON happy. Now we
+                        # decode the error code and return a stable string the
+                        # upstream activity log can render directly.
+                        #   02 SYNTAX_ERROR
+                        #   03 Command Buffer Full
+                        #   04 Command Canceled
+                        #   05 No Socket
+                        #   41 Command Not Executable (e.g. focus-direct in AF)
+                        return f'ERROR_{response[2]:02X}'
                     else:
-                        #print(f"CMD OTHER: {len(response)} {response!r}")           
+                        #print(f"CMD OTHER: {len(response)} {response!r}")
                         return response
 
             except socket.timeout:  # Occasionally we don't get a response?

@@ -1,4 +1,10 @@
 <?php
+  // VISCA-over-TCP class. Replaces the python/cam_control.py shell-out path
+  // for cmd=ptz / goto / goto_abs / focus_* / preset_speed below — saves the
+  // ~100 ms Python interpreter cold start per call and keeps everything in
+  // one language. cam_control.py stays in the repo for reference.
+  require_once __DIR__ . '/visca.php';
+
   // PTZOptics Camera Management Platform (CMP v1) — /cgi-bin/setAutoTracking/{0|1}.
   // The old 10.241.57.96:8811 entry pointed at a no-longer-reachable portproxy;
   // CMP is on the same 192.168.0.0/24 subnet as the cameras and is proxied by
@@ -320,143 +326,146 @@
   }
   elseif ($_GET['cmd'] == 'ptz')
   {
-    // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=ptz&camera=3
+    // Inquiry: read pan/tilt/zoom/focus from the camera over VISCA.
+    //   ?cmd=ptz&camera=N
     $cam = $_GET['camera'];
-
-    if (!is_numeric($cam))
-      die;
+    if (!is_numeric($cam)) die;
 
     header('Content-Type: application/json');
     $visca = GetCameraVISCA($cam);
     if (!$visca) { echo json_encode(['error' => 'unknown camera']); die; }
-    $cmd = sprintf(
-      "python3.9 %s --ip=%s --port=%s 2>&1",
-      escapeshellarg(__dir__."/python/cam_control.py"),
-      escapeshellarg($visca[0]),
-      escapeshellarg((string)$visca[1])
-    );
-    $raw = shell_exec($cmd);
-    $trimmed = trim($raw ?? '');
-    $probe = json_decode($trimmed, true);
-    if ($probe !== null) {
-      echo $trimmed;
-    } else {
-      echo json_encode(['error' => 'cam_control.py failed', 'stderr' => $trimmed]);
-    }
+
+    echo json_encode(visca_run($visca, function (Visca $v) use ($visca) {
+      return ['camera' => $visca[0]] + $v->getAllPositions();
+    }));
   }
   elseif ($_GET['cmd'] == 'goto')
   {
-    // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=goto&camera=1&val=100
+    // Recall an onboard preset slot (legacy path — still useful on cameras
+    // whose slots haven't been wiped by a firmware upgrade).
+    //   ?cmd=goto&camera=N&val=100
     $cam = $_GET['camera'];
     $val = $_GET['val'];
-
-    if (!is_numeric($cam) || !is_numeric($val))
-      die;
-
-    $visca = GetCameraVISCA($cam);
-    if (!$visca) die;
-    $json = shell_exec(sprintf(
-      "python3.9 %s --ip=%s --port=%s --cmd=goto --val=%s",
-      escapeshellarg(__dir__."/python/cam_control.py"),
-      escapeshellarg($visca[0]),
-      escapeshellarg((string)$visca[1]),
-      escapeshellarg($val)
-    ));
-    echo $json;
-  }
-  elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
-  {
-    // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=focus_auto&camera=1
-    $cam = $_GET['camera'];
-    if (!is_numeric($cam)) die;
+    if (!is_numeric($cam) || !is_numeric($val)) die;
 
     $visca = GetCameraVISCA($cam);
     if (!$visca) die;
 
     header('Content-Type: application/json');
-    $json = shell_exec(sprintf(
-      "python3.9 %s --ip=%s --port=%s --cmd=%s 2>&1",
-      escapeshellarg(__dir__."/python/cam_control.py"),
-      escapeshellarg($visca[0]),
-      escapeshellarg((string)$visca[1]),
-      escapeshellarg($_GET['cmd'])
-    ));
-    echo $json;
+    echo json_encode(visca_run($visca, function (Visca $v) use ($val, $visca) {
+      $r = $v->recallPreset((int)$val);
+      return ['camera' => $visca[0], 'response' => visca_jsonable($r)] + $v->getAllPositions();
+    }));
+  }
+  elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
+  {
+    // Focus mode / one-push AF via VISCA (PTZOptics 30X NDI's HTTP CGI
+    // doesn't expose these — only movement commands).
+    //   ?cmd=focus_auto&camera=N    — continuous autofocus
+    //   ?cmd=focus_manual&camera=N  — manual focus (NEAR/FAR then holds)
+    //   ?cmd=focus_onepush&camera=N — one-push AF trigger
+    $cam = $_GET['camera'];
+    if (!is_numeric($cam)) die;
+    $visca = GetCameraVISCA($cam);
+    if (!$visca) die;
+
+    $which = $_GET['cmd'];
+    header('Content-Type: application/json');
+    echo json_encode(visca_run($visca, function (Visca $v) use ($which, $visca) {
+      switch ($which) {
+        case 'focus_auto':    $r = $v->setFocusAuto();    break;
+        case 'focus_manual':  $r = $v->setFocusManual();  break;
+        case 'focus_onepush': $r = $v->focusOnePush();    break;
+        default:              $r = null;                  break;
+      }
+      return ['camera' => $visca[0], 'response' => visca_jsonable($r)] + $v->getAllPositions();
+    }));
   }
   elseif ($_GET['cmd'] == 'goto_abs')
   {
     // Drive the camera to an absolute pan/tilt/zoom/focus position read
     // from the preset JSON (not an onboard preset slot). Immune to firmware
-    // preset wipes.
-    //   ?cmd=goto_abs&camera=1&pan=-107&tilt=36&zoom=7791&focus=974
+    // preset wipes. Each axis omitted from the query is left untouched.
+    //   ?cmd=goto_abs&camera=N&pan=-107&tilt=36&zoom=7791&focus=974
+    //
+    // Per-axis responses are returned in `steps` so the JS activity log can
+    // pinpoint a rejected axis (e.g. focus-direct with the camera in AF
+    // returns ERROR_41 = "Command Not Executable"). Focus mode is queried
+    // first, forced to MF for the focus-direct command, then restored to
+    // AF if the camera was in AF — same behaviour cam_control.py had.
     $cam = $_GET['camera'];
     if (!is_numeric($cam)) die;
     $visca = GetCameraVISCA($cam);
     if (!$visca) die;
 
-    $args = '--cmd=goto_abs';
+    $axes = [];
     foreach (['pan', 'tilt', 'zoom', 'focus'] as $k) {
       if (isset($_GET[$k]) && preg_match('/^-?\d+$/', $_GET[$k])) {
-        $args .= " --{$k}=" . escapeshellarg($_GET[$k]);
+        $axes[$k] = (int)$_GET[$k];
       }
     }
 
     header('Content-Type: application/json');
-    $raw = shell_exec(sprintf(
-      "python3.9 %s --ip=%s --port=%s %s 2>&1",
-      escapeshellarg(__dir__."/python/cam_control.py"),
-      escapeshellarg($visca[0]),
-      escapeshellarg((string)$visca[1]),
-      $args
-    ));
-    $trimmed = trim($raw ?? '');
-    $probe = json_decode($trimmed, true);
-    if ($probe !== null) echo $trimmed;
-    else echo json_encode(['error' => 'cam_control.py failed', 'stderr' => $trimmed]);
+    echo json_encode(visca_run($visca, function (Visca $v) use ($axes, $visca) {
+      $steps           = [];
+      $response        = null;
+      $focusPriorMode  = null;
+
+      if (isset($axes['pan']) && isset($axes['tilt'])) {
+        $r = $v->setPanTiltPosition($axes['pan'], $axes['tilt']);
+        $steps[] = ['axis' => 'pantilt', 'response' => visca_jsonable($r)];
+        $response = $r;
+      }
+      if (isset($axes['zoom'])) {
+        $r = $v->setZoomPosition($axes['zoom']);
+        $steps[] = ['axis' => 'zoom', 'response' => visca_jsonable($r)];
+        $response = $r;
+      }
+      if (isset($axes['focus'])) {
+        // VISCA 04 48 (Focus Direct) only executes in manual-focus mode.
+        // Save the prior mode, force MF for the direct command, restore
+        // AF if the camera was in AF — no silent mode-swap. The prior
+        // mode is a query result (auto|manual|unknown) and lives at the
+        // top level so the "all steps must be COMPLETE" check upstream
+        // doesn't flag it as a failure.
+        $prior = $v->getFocusMode();
+        $focusPriorMode = $prior;
+
+        $r_mf = $v->setFocusManual();
+        $steps[] = ['axis' => 'focus_mode_mf', 'response' => visca_jsonable($r_mf)];
+
+        $r = $v->setFocusPosition($axes['focus']);
+        $steps[] = ['axis' => 'focus', 'response' => visca_jsonable($r)];
+        $response = $r;
+
+        if ($prior === 'auto') {
+          $r_af = $v->setFocusAuto();
+          $steps[] = ['axis' => 'focus_mode_restore', 'response' => visca_jsonable($r_af)];
+        }
+      }
+
+      $out = ['camera' => $visca[0]] + $v->getAllPositions();
+      if ($response !== null)        $out['response']          = visca_jsonable($response);
+      if ($steps)                    $out['steps']             = $steps;
+      if ($focusPriorMode !== null)  $out['focus_prior_mode']  = $focusPriorMode;
+      return $out;
+    }));
   }
   elseif ($_GET['cmd'] == 'preset_speed')
   {
-    //1..24
-    // https://voip.linkit.xyz/chatswood/control_thumb.php?cmd=preset_speed&camera=1&val=18
+    // Set onboard preset recall speed (1..24).
+    //   ?cmd=preset_speed&camera=N&val=18
     $cam = $_GET['camera'];
     $val = $_GET['val'];
-
-    if (!is_numeric($cam) || !is_numeric($val))
-      die;
-
-    $visca = GetCameraVISCA($cam);
-    if (!$visca) die;
-    $json = shell_exec(sprintf(
-      "python3.9 %s --ip=%s --port=%s --cmd=preset_speed --val=%s",
-      escapeshellarg(__dir__."/python/cam_control.py"),
-      escapeshellarg($visca[0]),
-      escapeshellarg((string)$visca[1]),
-      escapeshellarg($val)
-    ));
-    echo $json;
-  }
-  elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
-  {
-    // Focus mode / one-push AF via VISCA (the HTTP CGI on 30X NDI doesn't
-    // expose these — only movement commands).
-    //   ?cmd=focus_auto&camera=1    — continuous autofocus
-    //   ?cmd=focus_manual&camera=1  — manual focus (NEAR/FAR then holds)
-    //   ?cmd=focus_onepush&camera=1 — one-push AF trigger while in manual
-    $cam = $_GET['camera'];
-    if (!is_numeric($cam)) die;
-
+    if (!is_numeric($cam) || !is_numeric($val)) die;
     $visca = GetCameraVISCA($cam);
     if (!$visca) die;
 
     header('Content-Type: application/json');
-    $json = shell_exec(sprintf(
-      "python3.9 %s --ip=%s --port=%s --cmd=%s 2>&1",
-      escapeshellarg(__dir__."/python/cam_control.py"),
-      escapeshellarg($visca[0]),
-      escapeshellarg((string)$visca[1]),
-      escapeshellarg($_GET['cmd'])
-    ));
-    echo $json;
-  }     
+    echo json_encode(visca_run($visca, function (Visca $v) use ($val, $visca) {
+      $r = $v->setPresetSpeed((int)$val);
+      return ['camera' => $visca[0], 'response' => visca_jsonable($r)] + $v->getAllPositions();
+    }));
+  }
   
 ?>

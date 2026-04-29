@@ -80,11 +80,30 @@ function moveCamera(preset) {
     });
     if (preset.zoom  != null) params.set('zoom',  String(preset.zoom));
     if (preset.focus != null) params.set('focus', String(preset.focus));
+    // Log current → destination so the operator can see the full journey
+    // in a single line. Current position comes from the last cached VISCA
+    // poll; if we don't have one yet (first action of the session) the
+    // "from" half is left as "?".
+    const cur = (window.PTZState && window.PTZState.byCamera[preset.camera]) || null;
+    const fmtAxis = (k, dst) => {
+      const tgt = dst ?? '-';
+      if (!cur || cur[k] == null) return `${k[0]}:?→${tgt}`;
+      return `${k[0]}:${cur[k]}→${tgt}`;
+    };
     window.Log?.add('camera', `Move · Cam ${preset.camera} → ${preset.label}`,
-      `abs p=${preset.pan} t=${preset.tilt} z=${preset.zoom ?? '-'} f=${preset.focus ?? '-'}`);
-    // Surface any server-side failure to the activity log — otherwise a
-    // broken goto_abs looks indistinguishable from a working one.
-    fetch(`${endpoint}?${params}`)
+      [
+        fmtAxis('pan',   preset.pan),
+        fmtAxis('tilt',  preset.tilt),
+        fmtAxis('zoom',  preset.zoom),
+        fmtAxis('focus', preset.focus),
+      ].join(' '));
+    // Server-side goto_abs blocks until VISCA COMPLETE on every axis and
+    // returns the final pan/tilt/zoom/focus, so the response IS the
+    // authoritative "arrived" signal — no need to poll afterwards. We
+    // surface step failures to the activity log here, but the caller
+    // chains onto this promise for the post-arrival thumb refresh and
+    // Arrived log.
+    return fetch(`${endpoint}?${params}`)
       .then(r => r.text())
       .then(body => {
         const trimmed = (body || '').trim();
@@ -93,24 +112,39 @@ function moveCamera(preset) {
         if (data && data.error) {
           window.Log?.add('error', `goto_abs failed · Cam ${preset.camera}`,
             `${data.error}${data.stderr ? ' · ' + String(data.stderr).slice(0, 160) : ''}`);
-        } else if (!trimmed) {
+          return null;
+        }
+        if (!trimmed) {
           window.Log?.add('error', `goto_abs empty response · Cam ${preset.camera}`,
-            'PHP/python returned nothing — check cam_control.py stderr');
-        } else if (data && Array.isArray(data.steps)) {
-          // Per-axis log from cam_control.py. 'COMPLETE' means the camera
-          // accepted that axis; anything else (hex bytes, 'ERROR', null) is
-          // either a VISCA error (e.g. Command Not Executable on focus
-          // while AF is on) or a timeout/unknown response. Flag the bad
-          // ones individually so we know which axis to investigate.
+            'PHP returned nothing — check server logs');
+          return null;
+        }
+        if (data && Array.isArray(data.steps)) {
+          // Per-axis response from the VISCA layer. 'COMPLETE' means that
+          // axis landed cleanly; anything else (ERROR_xx, hex, null) is
+          // either a VISCA error (e.g. focus-direct while AF is on) or a
+          // timeout. Flag the bad ones individually so we know which
+          // axis to investigate.
           const bad = data.steps.filter(s => s.response !== 'COMPLETE');
           if (bad.length) {
             window.Log?.add('error', `goto_abs partial · Cam ${preset.camera}`,
               bad.map(s => `${s.axis}=${s.response ?? 'null'}`).join(' · '));
           }
         }
+        // Mirror the freshly-arrived position into the cache so other
+        // readers (the Move log's "from" half on the next click) pick it
+        // up without a separate poll.
+        if (data && data.pan != null && window.PTZState) {
+          window.PTZState.byCamera[preset.camera] = {
+            pan: data.pan, tilt: data.tilt, zoom: data.zoom, focus: data.focus,
+            ts: Date.now(),
+          };
+        }
+        return data;
       })
       .catch(err => {
         window.Log?.add('error', `goto_abs fetch error · Cam ${preset.camera}`, String(err));
+        return null;
       });
   } else {
     // No abs position stored. The camera-side preset slots were wiped by the
@@ -126,6 +160,9 @@ function moveCamera(preset) {
       `No saved position · Cam ${preset.camera} · ${preset.label}`,
       `Right-click → Save Camera ${preset.camera === '1' ? 'Back' : preset.camera === '2' ? 'Left' : 'Right'} to capture.`
     );
+    // Legacy path can't return a settled position — caller should fall
+    // back to settle().
+    return Promise.resolve(null);
   }
 }
 
@@ -309,11 +346,14 @@ const MIME_CAMERA = 'application/x-ls-camera';       // live-feed → preset (ca
 const MIME_PRESET = 'application/x-ls-preset-slot';  // preset   → preset (copy saved values)
 
 // Painted on top of <Thumb> when this thumb is the active (parked) preset
-// on its camera. Pulls a frame from window.LIVE_VIDEOS[<cam>] once per
-// second so the operator sees what the camera is actually looking at right
-// now, no server round-trip. The server-side thumbs/<id>.jpg cache is only
-// rewritten right before a move (capturePresetThumb in live-feeds.jsx) so
-// the on-disk copy stays a faithful "last view at this preset" snapshot.
+// on its camera. Pulls a frame from window.LIVE_VIDEOS[<cam>] at 10 Hz so
+// the operator sees what the camera is actually looking at right now —
+// no server round-trip. drawImage of an already-decoded video frame is a
+// GPU-accelerated copy (~0.5 ms each), so even with three thumbs running
+// simultaneously CPU usage stays well under 1%. The server-side
+// thumbs/<id>.jpg cache is only rewritten right before a move
+// (capturePresetThumb in live-feeds.jsx) so the on-disk copy stays a
+// faithful "last view at this preset" snapshot.
 function LiveThumbOverlay({ camera }) {
   const canvasRef = useRefPG(null);
   useEffectPG(() => {
@@ -335,7 +375,7 @@ function LiveThumbOverlay({ camera }) {
       } catch (_) { /* video not yet ready / drawn from another origin — ignore */ }
     };
     draw();                                  // immediate first paint
-    const id = setInterval(draw, 1000);      // ~1 Hz refresh
+    const id = setInterval(draw, 100);       // 10 Hz refresh
     return () => { alive = false; clearInterval(id); };
   }, [camera]);
 
@@ -478,7 +518,7 @@ function PresetColumn({ bucket, liveId, liveCameraNum, activeByCam, motionByCam,
               inMotion={isMotion}
               liveWarn={liveWarn}
               refreshTs={refreshMap[id]}
-              // Active (parked) thumbs render a 1 Hz WebRTC overlay so the
+              // Active (parked) thumbs render a 10 Hz WebRTC overlay so the
               // displayed frame matches what the camera is actually looking
               // at now. Suppressed during a transit so the in-motion amber
               // animation reads cleanly.
@@ -632,12 +672,13 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       // mistake it for an operator steal.
       queuePreRollIdRef.current = nextId;
       queuePreRollCamRef.current = nextCam;
-      moveCamera(nextPreset);
+      const preRollPromise = moveCamera(nextPreset);
       setActiveByCam(m => ({ ...m, [nextCam]: nextId }));
       setMotionByCam(m => ({ ...m, [nextCam]: nextId }));
-      // Clear motion + refresh thumb as soon as the camera actually settles,
-      // rather than at a fixed 5s wall clock.
-      window.PTZState?.settle(nextPreset.camera).then(() => {
+      // Clear motion + refresh thumb as soon as the camera actually arrives.
+      // Server-side goto_abs blocks until VISCA COMPLETE so the promise IS
+      // the arrival signal — no polling race.
+      const onPreRollArrived = () => {
         if (activeByCamRef.current[nextCam] !== nextId) return; // superseded
         setMotionByCam(m => (m[nextCam] === nextId ? { ...m, [nextCam]: null } : m));
         const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
@@ -651,6 +692,10 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
             .then(() => bump())
             .catch(() => {});
         });
+      };
+      preRollPromise.then(arrived => {
+        if (arrived && arrived.pan != null) onPreRollArrived();
+        else window.PTZState?.settle(nextPreset.camera).then(onPreRollArrived);
       });
     } else {
       // No pre-roll this tick (same camera). Clear any prior claim.
@@ -1103,9 +1148,12 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     // move command races through. Safe no-op if nothing was armed.
     await snapshotActiveOnCam(cam);
 
-    // First click → send the camera to this preset
+    // First click → send the camera to this preset. moveCamera now returns
+    // the goto_abs response promise, which resolves AFTER server-side
+    // VISCA COMPLETE on every axis — that's our authoritative arrival
+    // signal.
     const moveStart = performance.now();
-    moveCamera(preset);
+    const movePromise = moveCamera(preset);
     setActiveByCam(m => ({ ...m, [cam]: id }));
     setMotionByCam(m => ({ ...m, [cam]: id }));
     // Cueing a thumb also cues the scene for its camera — "only one cue'd
@@ -1147,15 +1195,21 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       }
     }
 
-    // Wait for the camera to actually arrive before touching motion marker /
-    // thumb / log. `settle()` polls VISCA every ~250 ms until two consecutive
-    // reads match, or 5 s max. Much tighter than the old fixed 5 s timeout —
-    // small pans clear in ~0.5 s, slow focus pulls get headroom up to the cap.
+    // Resolve "arrived" from the goto_abs response — server-side has
+    // already blocked on VISCA COMPLETE for every axis by the time the
+    // promise resolves, and the JSON body carries the final p/t/z/f.
+    // This replaces the old VISCA-polling settle() loop, which was racing
+    // with goto_abs: with the fast PHP backend the first 2-3 polls would
+    // return the *pre-move* position (camera hadn't started yet), look
+    // "stable", and trip "Arrived" before the camera had even left.
+    //
+    // Legacy fallback: if the preset has no abs values stored, moveCamera
+    // returns null and we still need settle() to find arrival via polling.
     //
     // Staleness guard: if the user clicked another thumb on the same camera
     // (or jogged PTZ) before we arrived, bail — the newer action owns the
     // motion marker and thumb refresh.
-    window.PTZState?.settle(preset.camera).then(pos => {
+    const onArrived = (pos) => {
       if (activeByCamRef.current[cam] !== id) return; // superseded
 
       const elapsedMs = Math.round(performance.now() - moveStart);
@@ -1177,11 +1231,7 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
           .catch(() => {});
       });
 
-      // Log the settled coordinates + total elapsed wall time from click to
-      // settle() resolving. Lets us eyeball whether a slow "Arrived" is the
-      // camera itself (big pan, long focus pull) vs. the settle loop (too
-      // many polls, too slow an interval, network round-trip overhead).
-      if (pos) {
+      if (pos && pos.pan != null) {
         window.Log?.add(
           'camera',
           `Arrived · Cam ${preset.camera} · ${preset.label}`,
@@ -1189,6 +1239,15 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
         );
       } else {
         window.Log?.add('camera', `Arrived · Cam ${preset.camera} · ${preset.label}`, `${elapsedMs}ms`);
+      }
+    };
+
+    movePromise.then(arrived => {
+      if (arrived && arrived.pan != null) {
+        onArrived(arrived);
+      } else {
+        // Legacy poscall path or fetch error → fall back to polling.
+        window.PTZState?.settle(preset.camera).then(onArrived);
       }
     });
   };

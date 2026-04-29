@@ -82,26 +82,100 @@
   // returns), so the first settle query usually already reads a stable
   // value. Minimum detection is now ~one interval + two query round-trips,
   // ≈ 500–700 ms total from the fetch resolving.
+  //
+  // Heartbeat: while the loop is still running, emits a "Moving · Cam N"
+  // log every ~1 s with elapsed wall time, in-flight poll count, and the
+  // most recent position read. Helps diagnose slow "Arrived" reports —
+  // e.g. is query() itself hanging (poll count not advancing), or are the
+  // values genuinely still changing (poll count climbing, p/t/z/f drifting),
+  // or is goto_abs holding the camera's VISCA TCP socket so concurrent
+  // queries queue server-side?
   function settle(cam, opts) {
-    const interval = (opts && opts.interval) || 250;
-    const maxWait  = (opts && opts.maxWait)  || 5000;
-    const start = Date.now();
-    let last = null;
+    const interval     = (opts && opts.interval)     || 250;
+    const maxWait      = (opts && opts.maxWait)      || 5000;
+    // If we never observe movement away from the initial reading, assume
+    // the click was a no-op (preset is already where the camera is parked)
+    // and resolve after this grace period. Without this, "stable" would
+    // trip on the very first repeat of the pre-move position, and we'd
+    // log "Arrived" before the camera has even started — which is exactly
+    // what happened once the PHP VISCA backend cut the goto_abs RTT down
+    // from ~200 ms to ~70 ms and exposed the race.
+    const noMoveGrace  = (opts && opts.noMoveGrace)  || 1500;
 
-    const sample = () => query(cam).then(pos => {
-      if (!pos) return null;
-      const stable = last
-        && last.pan  === pos.pan
-        && last.tilt === pos.tilt
-        && last.zoom === pos.zoom
-        && last.focus === pos.focus;
-      if (stable) return pos;
-      last = pos;
-      if (Date.now() - start >= maxWait) return pos;
-      return new Promise(r => setTimeout(r, interval)).then(sample);
+    const start = Date.now();
+    let initial = null;       // first poll's position (the "before move" snapshot)
+    let last    = null;       // most recent poll
+    let movementSeen = false; // have we observed pos != initial yet?
+    let queryCount = 0;
+    let resolved = false;
+
+    const samePos = (a, b) =>
+      !!(a && b && a.pan === b.pan && a.tilt === b.tilt
+                 && a.zoom === b.zoom && a.focus === b.focus);
+
+    const heartbeat = setInterval(() => {
+      if (resolved) return;
+      const elapsed = Date.now() - start;
+      const cur = state[cam];
+      const moveTag = movementSeen ? 'moving' : 'awaiting move';
+      const detail = cur
+        ? `${elapsed}ms · ${queryCount} polls · ${moveTag} · p=${cur.pan} t=${cur.tilt} z=${cur.zoom} f=${cur.focus}`
+        : `${elapsed}ms · ${queryCount} polls · ${moveTag} · no position yet`;
+      window.Log?.add('camera', `Moving · Cam ${cam}`, detail);
+    }, 1000);
+
+    const finish = (pos) => {
+      if (resolved) return last;       // hard timeout already resolved us
+      resolved = true;
+      clearInterval(heartbeat);
+      return pos;
+    };
+
+    // Hard wall-clock deadline. settle()'s inner `Date.now() - start >=
+    // maxWait` check only runs AFTER each query() resolves, so a single
+    // hung fetch (camera VISCA stalled, server queue contention, etc.)
+    // can blow past the cap by tens of seconds — exactly the 23 s
+    // "arrived" we saw in the field. This race ensures we give up at the
+    // declared maxWait regardless of what's in flight.
+    const deadline = new Promise((resolve) => {
+      setTimeout(() => {
+        if (resolved) return;
+        window.Log?.add('error', `settle timeout · Cam ${cam}`,
+          `${maxWait}ms cap hit · ${queryCount} polls · last in-flight query never returned`);
+        clearInterval(heartbeat);
+        resolved = true;
+        resolve(last);
+      }, maxWait);
     });
 
-    return sample();
+    const sample = () => {
+      if (resolved) return last;
+      queryCount++;
+      return query(cam).then(pos => {
+        if (resolved) return last;     // hard timeout already won the race
+        if (!pos) return finish(null);
+
+        if (initial === null) {
+          initial = pos;
+        } else if (!samePos(initial, pos)) {
+          movementSeen = true;
+        }
+
+        const stable  = samePos(last, pos);
+        const elapsed = Date.now() - start;
+
+        // Trust "stable" only once we've actually seen the camera move,
+        // OR enough time has elapsed that we conclude the move was a
+        // no-op (clicked preset == current camera position).
+        if (stable && (movementSeen || elapsed >= noMoveGrace)) return finish(pos);
+
+        last = pos;
+        if (elapsed >= maxWait) return finish(pos);
+        return new Promise(r => setTimeout(r, interval)).then(sample);
+      });
+    };
+
+    return Promise.race([sample(), deadline]);
   }
 
   function subscribe(fn) { subs.add(fn); return () => subs.delete(fn); }

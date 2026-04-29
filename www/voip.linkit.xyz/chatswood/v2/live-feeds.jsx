@@ -294,18 +294,51 @@ function LiveFeed({ cam, onAir, cued, onClick, onContextMenu, ptzSpeed }) {
   );
 }
 
-// Each wheel tick fires a brief movement pulse. The PTZOptics CGI has no
-// "step" command — only continuous motion + stop — so each tick sends the
-// start command and schedules a stop PULSE_MS later. Back-to-back ticks
-// reset the stop timer so rapid scrolling feels continuous.
-const PULSE_MS = 180;
+// Each wheel tick (re)schedules a stop pulse, but only fires a START command
+// when state actually changes (direction OR slow/fast). This matters because
+// every ptzCmd fetch triggers a digest-auth handshake server-side (~200-300ms
+// per command); the browser caps concurrent fetches at ~6/origin, so if we
+// fired a start on every wheel tick a fast scroll burst would queue up 10+
+// starts ahead of the eventual stop, which then arrives at the camera
+// hundreds of ms after the wheel went quiet — i.e. "panning doesn't stop
+// when wheel stops".
+//
+// Speed model — matches legacy v1 (control_v2.js ~line 980):
+//   - one isolated tick of the wheel = slowSpeed (a fine nudge)
+//   - rapid scrolling (events <FAST_GAP_MS apart) = fastSpeed (the operator's
+//     full slider value)
+// Continuous one-direction scroll therefore sends one slow start, one fast
+// start as the burst accelerates, then exactly one stop when the wheel goes
+// quiet — three commands total, no queue contention.
+const PULSE_MS = 160;
+const FAST_GAP_MS = 80;
 
-function makePulser(stopCmd, sendStart) {
+function makePulser(stopCmd, sendStart, fastSpeed, slowSpeed) {
   let stopTimer = null;
+  let lastTick = 0;
+  let activeDir = null;
+  let activeFast = false;
   return (dir) => {
-    sendStart(dir);
+    const now = Date.now();
+    const fast = (now - lastTick) < FAST_GAP_MS;
+    lastTick = now;
+
+    // Only re-issue start when state changed. While the camera is already
+    // moving in the right direction at the right speed, all we need is to
+    // keep pushing the stop timer back.
+    if (activeDir !== dir || activeFast !== fast) {
+      sendStart(dir, fast ? fastSpeed : slowSpeed);
+      activeDir = dir;
+      activeFast = fast;
+    }
+
     if (stopTimer) clearTimeout(stopTimer);
-    stopTimer = setTimeout(() => { stopCmd(); stopTimer = null; }, PULSE_MS);
+    stopTimer = setTimeout(() => {
+      stopCmd();
+      stopTimer = null;
+      activeDir = null;
+      activeFast = false;
+    }, PULSE_MS);
   };
 }
 
@@ -364,8 +397,13 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
     ]);
   };
 
-  const start = (direction) => {
-    const s = `${panSpeed}&${panSpeed}`;
+  // Press-and-hold motion uses the slider speed directly (continuous motion
+  // under the user's finger, so they control the duration). The optional
+  // `spd` argument is for the wheel pulser, which substitutes its own
+  // slow/fast value — see makePulser.
+  const start = (direction, spd) => {
+    const p = spd ?? panSpeed;
+    const s = `${p}&${p}`;
     const map = {
       t: `up&${s}`, b: `down&${s}`, l: `left&${s}`, r: `right&${s}`,
       tl: `leftup&${s}`, tr: `rightup&${s}`, bl: `leftdown&${s}`, br: `rightdown&${s}`,
@@ -373,16 +411,27 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
     if (map[direction]) ptzCmd(camera, map[direction]);
   };
   const stop = () => ptzCmd(camera, 'ptzstop');
-  const zoomStart = (kind) => ptzCmd(camera, `${kind === 'wide' ? 'zoomout' : 'zoomin'}&${zoomSpeed}`);
-  const zoomStop  = () => ptzCmd(camera, 'zoomstop');
-  const focusStart = (kind) => ptzCmd(camera, `${kind === 'near' ? 'focusin' : 'focusout'}&${zoomSpeed}`);
+  const zoomStart  = (kind, spd) => ptzCmd(camera, `${kind === 'wide' ? 'zoomout' : 'zoomin'}&${spd ?? zoomSpeed}`);
+  const zoomStop   = () => ptzCmd(camera, 'zoomstop');
+  const focusStart = (kind, spd) => ptzCmd(camera, `${kind === 'near' ? 'focusin' : 'focusout'}&${spd ?? zoomSpeed}`);
   const focusStop  = () => ptzCmd(camera, 'focusstop');
 
-  // Wheel handlers — each tick = one short pulse. Use useMemo-style closures
-  // so the stop timers persist across renders.
-  const pulseZoom  = React.useMemo(() => makePulser(zoomStop,  (kind) => zoomStart(kind)),  [camera, ptzSpeed]);
-  const pulseFocus = React.useMemo(() => makePulser(focusStop, (kind) => focusStart(kind)), [camera, ptzSpeed]);
-  const pulsePan   = React.useMemo(() => makePulser(stop,      (dir)  => start(dir)),       [camera, ptzSpeed]);
+  // Wheel handlers — each tick = one short slow pulse, with a fast-scroll
+  // boost when ticks come in close together. Slow-tick speeds are the
+  // legacy 1-of-the-range minimum so a single notch is a fine nudge; fast
+  // scroll bumps to the user's slider value for big moves.
+  const pulseZoom  = React.useMemo(
+    () => makePulser(zoomStop, (kind, spd) => zoomStart(kind, spd), zoomSpeed, 1),
+    [camera, ptzSpeed]
+  );
+  const pulseFocus = React.useMemo(
+    () => makePulser(focusStop, (kind, spd) => focusStart(kind, spd), zoomSpeed, 1),
+    [camera, ptzSpeed]
+  );
+  const pulsePan   = React.useMemo(
+    () => makePulser(stop, (dir, spd) => start(dir, spd), panSpeed, 2),
+    [camera, ptzSpeed]
+  );
 
   const onZoomWheel = (e) => {
     e.preventDefault();
@@ -393,16 +442,33 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
     pulseFocus(e.deltaY < 0 ? 'far' : 'near');
   };
 
-  // Press+release handlers. Mousewheel pulses the same direction as the
-  // arrow you're hovering over (one tick = one brief pulse), so wheel over
-  // the UP arrow nudges the camera up, wheel over LEFT pans left, etc.
+  // Pairs every arrow with its opposite so reverse-scrolling on a button
+  // pans the camera the other way (e.g. wheel-down while hovering the UP
+  // arrow tilts down). Lets the operator make a pair of fine corrections
+  // in opposite directions without moving the cursor between two buttons.
+  const PAN_OPPOSITE = {
+    t:  'b',  b:  't',
+    l:  'r',  r:  'l',
+    tl: 'br', br: 'tl',
+    tr: 'bl', bl: 'tr',
+  };
+
+  // Press+release handlers. Mousewheel pulses the arrow's primary direction
+  // when scrolled "forward" (wheel up), and the OPPOSITE direction when
+  // scrolled the other way — so wheel-up on UP nudges up, wheel-down on UP
+  // nudges down. Same pulser handles both, so fast-scroll boost still works
+  // when alternating directions on a single button.
   const pan = (d) => ({
     onMouseDown: () => start(d),
     onMouseUp: stop,
     onMouseLeave: stop,
     onTouchStart: () => start(d),
     onTouchEnd: stop,
-    onWheel: (e) => { e.preventDefault(); pulsePan(d); },
+    onWheel: (e) => {
+      e.preventDefault();
+      const dir = e.deltaY < 0 ? d : PAN_OPPOSITE[d];
+      if (dir) pulsePan(dir);
+    },
   });
   const ctrl = (onStart, onEnd) => ({
     onMouseDown: onStart, onMouseUp: onEnd, onMouseLeave: onEnd,
@@ -461,8 +527,8 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
         <div className="ctrl-group" onWheel={onZoomWheel}>
           <div className="ctrl-label">ZOOM</div>
           <div className="ctrl-pair">
-            <button className="ctrl-btn" aria-label="Zoom wide" {...ctrl(() => zoomStart('wide'), zoomStop)}><ZoomIcon kind="wide"/><em>WIDE</em></button>
             <button className="ctrl-btn" aria-label="Zoom tele" {...ctrl(() => zoomStart('tele'), zoomStop)}><ZoomIcon kind="tele"/><em>TELE</em></button>
+            <button className="ctrl-btn" aria-label="Zoom wide" {...ctrl(() => zoomStart('wide'), zoomStop)}><ZoomIcon kind="wide"/><em>WIDE</em></button>
           </div>
         </div>
         <div className="ctrl-group" onWheel={onFocusWheel}>
