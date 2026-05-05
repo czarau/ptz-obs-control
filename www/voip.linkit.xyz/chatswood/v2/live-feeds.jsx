@@ -668,6 +668,7 @@ function DataControls({ dataLive }) {
         className={"datbtn" + (overlay === 'dp' ? " on" : "")}
         onClick={() => toggleOverlay('dp')}
       >
+        <DataIcon kind="overlay"/>
         {overlay === 'dp' && <span className="dot dot-green"/>}
         Overlay
       </button>
@@ -675,6 +676,7 @@ function DataControls({ dataLive }) {
         className={"datbtn" + (overlay === 'l3rd' ? " on" : "")}
         onClick={() => toggleOverlay('l3rd')}
       >
+        <DataIcon kind="lthird"/>
         {overlay === 'l3rd' && <span className="dot dot-green"/>}
         Lower Third
       </button>
@@ -682,11 +684,55 @@ function DataControls({ dataLive }) {
         className={"datbtn" + (slides ? " on" : "")}
         onClick={toggleSlides}
       >
+        <DataIcon kind="slides"/>
         {slides && <span className="dot dot-green"/>}
         Slides
       </button>
     </div>
   );
+}
+
+// Mini-screen icons for the data-projection control bar. Each shows a TV
+// frame with the relevant overlay/slot region filled or divided. 18×12
+// fits the 10.5px button label height without crowding. Uses currentColor
+// throughout so the icon tints with the button's text colour (so the .on
+// state — green text — gets a green icon for free).
+function DataIcon({ kind }) {
+  const frame = <rect x="0.5" y="0.5" width="17" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1"/>;
+  if (kind === 'overlay') {
+    // Top-right corner overlay (e.g. logo / speaker bug).
+    return (
+      <svg viewBox="0 0 18 12" width="18" height="12" aria-hidden="true">
+        {frame}
+        <rect x="11" y="2" width="5" height="3.5" rx="0.5" fill="currentColor"/>
+      </svg>
+    );
+  }
+  if (kind === 'lthird') {
+    // Lower-third bar across the bottom.
+    return (
+      <svg viewBox="0 0 18 12" width="18" height="12" aria-hidden="true">
+        {frame}
+        <rect x="2" y="7.5" width="14" height="2.5" rx="0.4" fill="currentColor"/>
+      </svg>
+    );
+  }
+  if (kind === 'slides') {
+    // 2/3 left = DP slides (outlined, with stand-in text rules); 1/3 right
+    // = speaker camera (filled). Vertical divider at 2/3 of the frame
+    // width — matches the OBS "DP & Speaker" composite scene exactly.
+    return (
+      <svg viewBox="0 0 18 12" width="18" height="12" aria-hidden="true">
+        {frame}
+        <line x1="12" y1="0.5" x2="12" y2="11.5" stroke="currentColor" strokeWidth="1"/>
+        <line x1="2.5" y1="3.5" x2="9.5" y2="3.5" stroke="currentColor" strokeWidth="0.8" opacity="0.7"/>
+        <line x1="2.5" y1="6"   x2="9.5" y2="6"   stroke="currentColor" strokeWidth="0.8" opacity="0.7"/>
+        <line x1="2.5" y1="8.5" x2="7"   y2="8.5" stroke="currentColor" strokeWidth="0.8" opacity="0.7"/>
+        <rect x="12" y="0.5" width="5.5" height="11" fill="currentColor" opacity="0.45"/>
+      </svg>
+    );
+  }
+  return null;
 }
 
 // Display-label → OBS input name (matches the three sources the audio-source
