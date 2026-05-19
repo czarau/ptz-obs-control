@@ -91,7 +91,7 @@ function focusCmd(camera, cmd) {
   window.Log?.add('camera', `Focus ${cmd.replace('focus_', '')} · Cam ${camera}`);
 }
 
-function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeCuedScene, overlays, setOverlays, onTake, ptzSpeed }) {
+function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeCuedScene, overlays, setOverlays, onTake, ptzSpeed, focusCamId, setFocusCamId }) {
   const cams = [CAM_META.back, CAM_META.left, CAM_META.right, CAM_META.data];
   const menu = useContextMenu();
 
@@ -200,9 +200,11 @@ function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeC
           cam={c}
           onAir={liveCamId === c.id}
           cued={cuedSceneId === c.id}
+          focused={focusCamId === c.id}
           ptzSpeed={ptzSpeed}
           onClick={() => onFeedClick(c)}
           onContextMenu={(e) => openFeedContext(e, c)}
+          setFocusCamId={setFocusCamId}
         />
       ))}
       <OverlayDock overlays={overlays} setOverlays={setOverlays} onTake={onTake}/>
@@ -213,7 +215,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeC
 
 const { useState: useStateLF, useEffect: useEffectLF, useRef: useRefLF } = React;
 
-function LiveFeed({ cam, onAir, cued, onClick, onContextMenu, ptzSpeed }) {
+function LiveFeed({ cam, onAir, cued, focused, onClick, onContextMenu, ptzSpeed, setFocusCamId }) {
   const videoRef = useRefLF(null);
 
   // Spin up a WebRTC peer connection when the element mounts, tear it down on unmount.
@@ -259,9 +261,24 @@ function LiveFeed({ cam, onAir, cued, onClick, onContextMenu, ptzSpeed }) {
           )}
           <span className="feed-title">{cam.label}</span>
         </span>
-        {onAir && <span className="feed-live"><span/>LIVE</span>}
-        {cued && !onAir && <span className="feed-cuebadge">CUE</span>}
-        {!onAir && !cued && <span className="feed-hint">{cam.hint}</span>}
+        <span className="feed-head-right">
+          {/* Expand → focus mode. Only for real PTZ cameras (data feed has
+            * no camera number and the focus view would be pointless for a
+            * static projector source). */}
+          {cam.camera > 0 && setFocusCamId && (
+            <button
+              className={"feed-focus-btn" + (focused ? " on" : "")}
+              onClick={(e) => { e.stopPropagation(); setFocusCamId(focused ? null : cam.id); }}
+              title={focused ? "Exit focus mode (Esc)" : "Focus mode — full-screen view with crosshairs"}
+              aria-label={focused ? "Exit focus mode" : "Open focus mode"}
+            >
+              <ExpandIcon/>
+            </button>
+          )}
+          {onAir && <span className="feed-live"><span/>LIVE</span>}
+          {cued && !onAir && <span className="feed-cuebadge">CUE</span>}
+          {!onAir && !cued && <span className="feed-hint">{cam.hint}</span>}
+        </span>
       </div>
       {/* draggable on feed-img only so ptzpad arrows / zoom / focus buttons
        *  below remain interactive (mousedown there would otherwise start a
@@ -891,4 +908,102 @@ function HealthRow({ label, value, unit, good }) {
   );
 }
 
-Object.assign(window, { LiveFeedRow });
+// Four-corner-arrows icon for the "expand to focus mode" button in the
+// feed head. Uses currentColor so it tints with the button's text colour.
+function ExpandIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none"
+         stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+         aria-hidden="true">
+      <path d="M3 6V3h3 M13 6V3h-3 M3 10v3h3 M13 10v3h-3"/>
+    </svg>
+  );
+}
+
+// Focus mode — fills the preset-grid area with a live WebRTC view of one
+// PTZ camera, overlaid with rule-of-thirds grid + centre reticle for
+// framing and easier focus. The bottom feed row (PTZ pads, audio meters,
+// TAKE) stays put so the operator can still pan / zoom / one-push AF
+// while watching the big view. The keyboard PTZ target also switches to
+// the focused camera while this is mounted (see ptzTargetCam in app.jsx).
+//
+// A separate WebRTC peer is created for the focus view rather than
+// reusing the bottom card's <video> element — moving an active media
+// element across the DOM is flaky, and two simultaneous streams for one
+// camera is fine for the duration of framing/focus work.
+function FocusOverlay({ camId, onClose }) {
+  const videoRef = useRefLF(null);
+  const cam = CAM_META[camId];
+
+  useEffectLF(() => {
+    const url = (window.LS_CONFIG?.webrtcStreams || {})[camId];
+    if (!url || !videoRef.current || !window.startWebRTCPlay) return;
+    const pc = window.startWebRTCPlay(videoRef.current, url);
+    return () => { try { pc && pc.close(); } catch (_) {} };
+  }, [camId]);
+
+  if (!cam || !cam.camera) return null;
+
+  const onePushAF = () => {
+    const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || '../control_thumb.php';
+    fetch(`${endpoint}?cmd=focus_onepush&camera=${cam.camera}&ts=${Date.now()}`).catch(() => {});
+    window.Log?.add('camera', `One-push AF · Cam ${cam.camera}`, 'focus mode');
+  };
+
+  return (
+    <div className="focus-overlay" role="dialog" aria-label={`Focus mode · ${cam.label}`}>
+      <video
+        ref={videoRef}
+        className="focus-video"
+        autoPlay
+        muted
+        playsInline
+        disablePictureInPicture
+        disableRemotePlayback
+      />
+      <FocusCrosshairs/>
+      <div className="focus-label">
+        <span className="focus-label-dot"/>
+        {cam.label} · Focus
+      </div>
+      <div className="focus-controls">
+        <button className="focus-btn" onClick={onePushAF} title="Trigger one-push autofocus">
+          One-Push AF
+        </button>
+        <button className="focus-btn focus-close" onClick={onClose} title="Close (Esc)">
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Framing aids painted on top of the focus-mode video:
+//   - Rule-of-thirds gridlines (subtle, full width/height) so the operator
+//     can park subjects on the grid intersections
+//   - Centre reticle (circle + crosshair + dot) for centring shots, with
+//     a slightly bolder centre dot to indicate the exact lens centre
+// Pure CSS / SVG; no JS animation. pointer-events:none so clicks pass
+// through to anything beneath (currently nothing — overlay is purely
+// display, controls have their own pointer-events: auto).
+function FocusCrosshairs() {
+  return (
+    <div className="focus-cross" aria-hidden="true">
+      <div className="focus-rt v" style={{ left:  '33.333%' }}/>
+      <div className="focus-rt v" style={{ left:  '66.666%' }}/>
+      <div className="focus-rt h" style={{ top:   '33.333%' }}/>
+      <div className="focus-rt h" style={{ top:   '66.666%' }}/>
+      <svg className="focus-reticle" width="56" height="56" viewBox="0 0 56 56"
+           fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1.1">
+        <circle cx="28" cy="28" r="18"/>
+        <line x1="28" y1="6"  x2="28" y2="16"/>
+        <line x1="28" y1="40" x2="28" y2="50"/>
+        <line x1="6"  y1="28" x2="16" y2="28"/>
+        <line x1="40" y1="28" x2="50" y2="28"/>
+        <circle cx="28" cy="28" r="1.2" fill="rgba(255,255,255,0.95)" stroke="none"/>
+      </svg>
+    </div>
+  );
+}
+
+Object.assign(window, { LiveFeedRow, FocusOverlay });

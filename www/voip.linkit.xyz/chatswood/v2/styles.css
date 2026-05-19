@@ -394,6 +394,23 @@ em { font-style: normal; }
 .feed video::-webkit-media-controls { display: none !important; }
 .feed-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surf-2); }
 .feed-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.feed-head-right { display: flex; align-items: center; gap: 8px; }
+/* Expand → focus mode. Subtle by default so it doesn't compete with the
+ * CUE/LIVE badge; brighter on hover and active when focus mode is open
+ * for this camera. */
+.feed-focus-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 18px;
+  background: transparent;
+  color: var(--text-3);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.feed-focus-btn:hover { color: var(--text); background: var(--surf-3); border-color: var(--border); }
+.feed-focus-btn.on    { color: var(--live); background: var(--live-dim); border-color: var(--live); }
 .feed-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text); }
 /* The right side of the head swaps between three elements depending on state
  * (hint / CUE badge / LIVE indicator). They have different intrinsic heights
@@ -637,3 +654,93 @@ em { font-style: normal; }
 
 /* Tweaks panel positioning */
 #tweaks-panel-root { font-family: var(--font-ui); }
+
+/* ---------- PRESET AREA + FOCUS MODE ----------
+ * .preset-area is the grid cell that holds <PresetGrid>. We wrap the grid
+ * in this container so <FocusOverlay> can position: absolute inside it
+ * and cover JUST the preset region — the bottom feed row (PTZ pads +
+ * dock) keeps its layout slot and stays usable. min-height: 0 keeps the
+ * inner grid able to shrink within minmax(0, 1fr); display:flex with the
+ * preset-grid as flex:1 lets it claim the full height of the cell. */
+.preset-area {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.preset-area > .preset-grid { flex: 1; min-height: 0; }
+
+.focus-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--live);
+  box-shadow: 0 0 0 1px var(--live), 0 0 28px rgba(34,197,94,0.22);
+}
+.focus-video {
+  width: 100%; height: 100%;
+  object-fit: contain;       /* preserve 16:9 — letterbox if container is taller */
+  background: #000;
+  display: block;
+}
+/* Hide Chrome's hover PiP button (same trick as the bottom feed cards). */
+.focus-overlay video::-webkit-media-controls-picture-in-picture-button,
+.focus-overlay video::-internal-media-controls-overflow-button,
+.focus-overlay video::-webkit-media-controls-overlay-enclosure { display: none !important; }
+
+/* Framing aids — purely visual, no pointer interaction. */
+.focus-cross { position: absolute; inset: 0; pointer-events: none; }
+.focus-rt {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.focus-rt.v { top: 0; bottom: 0; width: 1px; }
+.focus-rt.h { left: 0; right: 0; height: 1px; }
+.focus-reticle {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+}
+
+.focus-label {
+  position: absolute;
+  top: 12px; left: 12px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,0.65);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+.focus-label-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 6px rgba(34,197,94,0.7);
+}
+
+.focus-controls {
+  position: absolute;
+  top: 12px; right: 12px;
+  display: flex; align-items: center; gap: 6px;
+  z-index: 1;
+}
+.focus-btn {
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.focus-btn:hover { background: rgba(0,0,0,0.85); border-color: rgba(255,255,255,0.35); }
+.focus-btn.focus-close { padding: 6px 10px; font-size: 13px; line-height: 1; }

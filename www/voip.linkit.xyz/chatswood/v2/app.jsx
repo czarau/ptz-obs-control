@@ -18,6 +18,12 @@ function App() {
   // emergency, or when an external OBS scene change is picked up by the
   // poll.
   const [cuedSceneId, setCuedSceneId] = useState(null);
+  // Focus mode — when set to a camera id ('back'/'left'/'right'), the
+  // preset grid is replaced by a full-area live view of that camera with
+  // crosshairs + rule-of-thirds overlays for centring shots and dialling
+  // focus. The PTZ pad at the bottom stays usable so the operator can pan,
+  // zoom, and one-push AF while looking at the big view.
+  const [focusCamId, setFocusCamId] = useState(null);
   const LIVE_CAM_NUM = { back: 1, left: 2, right: 3, data: 0 };
   const CAM_NUM_TO_ID = { 1: "back", 2: "left", 3: "right", 0: "data" };
   const SCENE_FOR_ID = {
@@ -35,10 +41,15 @@ function App() {
     'Emergency':        'emergency',
   };
   const liveCamera = LIVE_CAM_NUM[liveCamId];
-  // Camera that arrow-key PTZ acts on: prefer the cued camera so operators
-  // can frame the next shot before taking it, fall back to live when
-  // nothing is cued so basic jog still works.
-  const ptzTargetCam = cuedSceneId != null ? LIVE_CAM_NUM[cuedSceneId] : liveCamera;
+  // Camera that arrow-key PTZ acts on. Priority:
+  //   1. Focus mode wins — the operator is staring at that big view,
+  //      arrow keys should nudge what they're framing.
+  //   2. Otherwise prefer the cued camera so they can frame the next
+  //      shot before taking it.
+  //   3. Fall back to live when nothing is cued so basic jog still works.
+  const ptzTargetCam = focusCamId    != null ? LIVE_CAM_NUM[focusCamId]
+                     : cuedSceneId   != null ? LIVE_CAM_NUM[cuedSceneId]
+                     :                          liveCamera;
   // Whether an id names a real "switchable" scene (not emergency, not null).
   // Used to decide whether it's a valid cue target when a scene transitions.
   const isCuableSceneId = (id) => id === 'back' || id === 'left' || id === 'right' || id === 'data';
@@ -268,7 +279,12 @@ function App() {
       const tag = (e.target && e.target.tagName) || '';
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
 
-      if (e.key === "Escape") { setShowLegend(false); setShowActivity(false); return; }
+      if (e.key === "Escape") {
+        if (focusCamId) { setFocusCamId(null); return; }
+        setShowLegend(false);
+        setShowActivity(false);
+        return;
+      }
 
       // Scene cue / take. Matches the feed two-click model.
       const KEY_TO_SCENE = { '1': 'back', '2': 'left', '3': 'right', '4': 'data' };
@@ -306,7 +322,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [liveCamera, ptzTargetCam, cuedSceneId, rail.ptzSpeed]);
+  }, [liveCamera, ptzTargetCam, cuedSceneId, focusCamId, rail.ptzSpeed]);
 
   return (
     <div className="app">
@@ -320,19 +336,28 @@ function App() {
         setShowActivity={setShowActivity}
       />
       <main className="main">
-        <PresetGrid
-          liveId={liveId}
-          setLive={setLive}
-          liveCamera={liveCamera}
-          onTakeSceneLiveFromNumber={onTakeSceneLiveFromNumber}
-          setCuedSceneFromNumber={setCuedSceneFromNumber}
-          admin={admin}
-          queueRunning={queueRunning}
-          setQueueRunning={setQueueRunning}
-          queueIdx={queueIdx}
-          advanceQueue={advanceQueue}
-          showCustom={true}
-        />
+        {/* Wrap the preset grid so FocusOverlay can absolute-position over
+          * just that area — the bottom feed row (PTZ pads + dock) stays put
+          * and usable while focus mode is active. PresetGrid stays mounted
+          * to preserve its activeByCam / queue / motion state. */}
+        <div className="preset-area">
+          <PresetGrid
+            liveId={liveId}
+            setLive={setLive}
+            liveCamera={liveCamera}
+            onTakeSceneLiveFromNumber={onTakeSceneLiveFromNumber}
+            setCuedSceneFromNumber={setCuedSceneFromNumber}
+            admin={admin}
+            queueRunning={queueRunning}
+            setQueueRunning={setQueueRunning}
+            queueIdx={queueIdx}
+            advanceQueue={advanceQueue}
+            showCustom={true}
+          />
+          {focusCamId && (
+            <FocusOverlay camId={focusCamId} onClose={() => setFocusCamId(null)} />
+          )}
+        </div>
         <LiveFeedRow
           liveCamId={liveCamId}
           setLiveCam={setLiveCam}
@@ -341,6 +366,8 @@ function App() {
           takeCuedScene={takeCuedScene}
           ptzSpeed={rail.ptzSpeed}
           onTake={onTake}
+          focusCamId={focusCamId}
+          setFocusCamId={setFocusCamId}
         />
       </main>
 
