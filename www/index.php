@@ -34,7 +34,7 @@
   // running stale code indefinitely — e.g. a preset-grid missing the
   // goto_abs path keeps firing poscall on a firmware-wiped camera. Bump this
   // whenever you ship a change to any asset in this directory.
-  $ASSET_VER = '50';
+  $ASSET_VER = '51';
 
   $dataDir = __DIR__ . '/.data';
   $user = (isset($_GET['id']) && $_GET['id'] === 'shccc') ? 'shccc' : 'chatswood';
@@ -73,6 +73,7 @@
   <meta charset="utf-8"/>
   <title>LiveStream — Church Broadcast Console</title>
   <meta name="viewport" content="width=1440"/>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=<?= $ASSET_VER ?>"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>

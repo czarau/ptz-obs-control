@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Live">
+  <rect width="512" height="512" rx="92" fill="#ffffff"/>
+  <g fill="#333332">
+    <rect x="88" y="152" width="282" height="208" rx="42"/>
+    <path d="M344 216c0-14 15-23 27-16l90 52c11 6 18 18 18 31v78c0 14-15 23-27 16l-90-52c-11-6-18-18-18-31z"/>
+  </g>
+  <text x="128" y="295" fill="#ffffff" font-family="Arial Black, Impact, Arial, sans-serif" font-size="116" font-weight="900" letter-spacing="-8">LIVE</text>
+  <circle cx="355" cy="236" r="17" fill="#e83a34"/>
+  <path d="M361 218c-13 13-13 24 0 37" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+</svg>

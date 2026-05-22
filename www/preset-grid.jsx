@@ -1043,6 +1043,15 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     window.Log?.add('camera', `Drop-save · Cam ${cam} → ${label}`, `capturing PTZ + thumb…`);
     const next = { ...preset, label: preset.label || 'Preset' };
 
+    // The drop saved the camera's CURRENT position into this slot, so the
+    // camera is — by definition — sitting on this preset right now. Arm it on
+    // its camera so the tile reflects reality immediately: it shows LIVE if
+    // this is the live camera, or CUE (and cues the scene for a take) if it
+    // isn't. Mirrors the arming half of onThumbClick, minus the move — there's
+    // nothing to move, the camera is already here.
+    setActiveByCam(m => ({ ...m, [String(cam)]: id }));
+    if (setCuedSceneFromNumber) setCuedSceneFromNumber(cam);
+
     const presetId = (window.LS_CONFIG?.presetStartIndex || 100) + preset.slot;
     const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || 'control_thumb.php';
 
