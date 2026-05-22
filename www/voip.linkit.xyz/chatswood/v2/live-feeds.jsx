@@ -91,7 +91,7 @@ function focusCmd(camera, cmd) {
   window.Log?.add('camera', `Focus ${cmd.replace('focus_', '')} · Cam ${camera}`);
 }
 
-function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeCuedScene, overlays, setOverlays, onTake, ptzSpeed, focusCamId, setFocusCamId }) {
+function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeCuedScene, overlays, setOverlays, onTake, ptzSpeed, focusCamId, setFocusCamId, dissolveMs, setDissolveMs }) {
   const cams = [CAM_META.back, CAM_META.left, CAM_META.right, CAM_META.data];
   const menu = useContextMenu();
 
@@ -207,7 +207,7 @@ function LiveFeedRow({ liveCamId, setLiveCam, cuedSceneId, setCuedSceneId, takeC
           setFocusCamId={setFocusCamId}
         />
       ))}
-      <OverlayDock overlays={overlays} setOverlays={setOverlays} onTake={onTake}/>
+      <OverlayDock overlays={overlays} setOverlays={setOverlays} onTake={onTake} dissolveMs={dissolveMs} setDissolveMs={setDissolveMs}/>
       <ContextMenu state={menu.state} onClose={menu.close} />
     </div>
   );
@@ -761,7 +761,35 @@ const METER_SOURCES = {
   'BACKUP':     'Audio - Video Mix (Aux 5 Analogue)',
 };
 
-function OverlayDock({ overlays, setOverlays, onTake }) {
+// Dissolve-speed slider — sits above the TAKE button and mirrors the PTZ
+// Speed slider in the left rail (ticks + value readout + range input). Drives
+// the OBS scene-transition duration that takeCuedScene() applies on each take.
+// Value is the transition duration in ms (0 = hard cut … DISSOLVE_MAX_MS).
+const DISSOLVE_MAX_MS = 4000;
+function DissolveSlider({ dissolveMs = 300, setDissolveMs }) {
+  const onTicks = Math.round((dissolveMs / DISSOLVE_MAX_MS) * 10);
+  return (
+    <div className="dissolve">
+      <div className="dock-head">Dissolve</div>
+      <div className="ptz-row">
+        <div className="ptz-ticks">
+          {Array.from({length: 10}).map((_, i) => (
+            <span key={i} className={"ptz-tick" + (i < onTicks ? " on" : "")} />
+          ))}
+        </div>
+        <div className="ptz-val">{(dissolveMs / 1000).toFixed(1)}<span>s</span></div>
+      </div>
+      <input
+        type="range" min="0" max={DISSOLVE_MAX_MS} step="100" value={dissolveMs}
+        onChange={e => setDissolveMs && setDissolveMs(+e.target.value)}
+        className="ptz-slider"
+        title="Scene-transition (dissolve) duration"
+      />
+    </div>
+  );
+}
+
+function OverlayDock({ overlays, setOverlays, onTake, dissolveMs = 300, setDissolveMs }) {
   // Subscribe once for the whole dock; each <Meter> below reads the latest
   // value out of window.OBSMeters at every re-render.
   const [, setMeterTick] = useStateLF(0);
@@ -815,6 +843,7 @@ function OverlayDock({ overlays, setOverlays, onTake }) {
       </div>
 
       <div className="dock-sec dock-take">
+        <DissolveSlider dissolveMs={dissolveMs} setDissolveMs={setDissolveMs} />
         <button className="take-btn" onClick={onTake}>
           <span>TAKE</span>
           <em>Space</em>

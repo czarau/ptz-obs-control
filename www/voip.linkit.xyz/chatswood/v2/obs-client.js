@@ -61,12 +61,27 @@ const OBS = (() => {
   const OVERLAY_SCENES = ['Camera 1 - Back', 'Camera 2 - Left', 'Camera 3 - Right'];
 
   return {
-    switchScene(name) {
-      return call('SetCurrentProgramScene', { sceneName: name });
+    // Switch program scene. When durationMs is supplied, set the current
+    // transition's duration first (in the same session) so the operator's
+    // dissolve-speed slider takes effect on this take. Wrapped in catch so a
+    // non-configurable transition (e.g. Cut) doesn't block the scene change.
+    switchScene(name, durationMs) {
+      return withSession(obs => {
+        const setDur = (durationMs != null)
+          ? obs.call('SetCurrentSceneTransitionDuration', { transitionDuration: Math.round(durationMs) }).catch(() => {})
+          : Promise.resolve();
+        return setDur.then(() => obs.call('SetCurrentProgramScene', { sceneName: name }));
+      });
     },
 
     currentScene() {
       return call('GetCurrentProgramScene').then(d => d.currentProgramSceneName);
+    },
+
+    // Current scene-transition duration in ms (for initialising the
+    // dissolve-speed slider so it reflects OBS's actual setting on load).
+    transitionDuration() {
+      return call('GetCurrentSceneTransition').then(d => d.transitionDuration);
     },
 
     toggleRecord() {

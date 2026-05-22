@@ -10,6 +10,16 @@ function App() {
     ptzSpeed: 6,
   });
 
+  // Dissolve (scene-transition) duration in ms, driven by a slider above the
+  // TAKE button. Applied to OBS on every take via switchScene(); initialised
+  // from OBS's current transition below so the slider reflects reality.
+  const [dissolveMs, setDissolveMs] = useState(300);
+  useEffect(() => {
+    window.OBS?.transitionDuration?.()
+      .then(ms => { if (typeof ms === 'number') setDissolveMs(ms); })
+      .catch(() => {});
+  }, []);
+
   const [liveId, setLive] = useState(null);
   const [liveCamId, setLiveCam] = useState("back");
   // cuedSceneId follows the same CUE → LIVE two-click model the preset
@@ -118,7 +128,7 @@ function App() {
     if (cuedSceneId === 'data' && window.LS_SLIDES) {
       scene = 'DP & Speaker';
     }
-    if (window.OBS && scene) window.OBS.switchScene(scene).catch(() => {});
+    if (window.OBS && scene) window.OBS.switchScene(scene, dissolveMs).catch(() => {});
     window.Log?.add('live', `LIVE → ${cuedSceneId.toUpperCase()}`, scene);
     onTakeSceneLive(cuedSceneId);
   };
@@ -138,7 +148,8 @@ function App() {
     // the auto-queue so it doesn't take a preset live while the holding slide
     // is on air. Eagerly set liveCamId to 'emergency' so no preset / feed
     // card shows as LIVE until the next scene change.
-    if (window.OBS) window.OBS.switchScene(window.OBS.SCENE.emergency).catch(() => {});
+    // Emergency is a hard cut regardless of the dissolve slider — pass 0.
+    if (window.OBS) window.OBS.switchScene(window.OBS.SCENE.emergency, 0).catch(() => {});
     setQueueRunning(false);
     setLiveCam('emergency');
     setCuedSceneId(null);
@@ -322,7 +333,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [liveCamera, ptzTargetCam, cuedSceneId, focusCamId, rail.ptzSpeed]);
+  }, [liveCamera, ptzTargetCam, cuedSceneId, focusCamId, rail.ptzSpeed, dissolveMs]);
 
   return (
     <div className="app">
@@ -366,6 +377,8 @@ function App() {
           takeCuedScene={takeCuedScene}
           ptzSpeed={rail.ptzSpeed}
           onTake={onTake}
+          dissolveMs={dissolveMs}
+          setDissolveMs={setDissolveMs}
           focusCamId={focusCamId}
           setFocusCamId={setFocusCamId}
         />

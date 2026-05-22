@@ -7,13 +7,14 @@
   // running stale code indefinitely — e.g. a preset-grid missing the
   // goto_abs path keeps firing poscall on a firmware-wiped camera. Bump this
   // whenever you ship a change to any asset in this directory.
-  $ASSET_VER = '48';
+  $ASSET_VER = '49';
 
   $dataDir = __DIR__ . '/../.data';
   $user = (isset($_GET['id']) && $_GET['id'] === 'shccc') ? 'shccc' : 'chatswood';
 
   if ($user === 'shccc') {
-    $WebOBS_IP_Addr  = 'ws://10.241.57.96:4455';
+    //$WebOBS_IP_Addr  = 'ws://10.241.57.96:4455';
+    $WebOBS_IP_Addr  = 'wss://srv-syd05.chatswoodchurch.org:4444';
     $WebOBS_Password = 'XXXXX';
     $settingsFile    = "$dataDir/settings-shccc.json";
   } else {
