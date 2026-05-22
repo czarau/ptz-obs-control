@@ -335,7 +335,7 @@ function App() {
         showActivity={showActivity}
         setShowActivity={setShowActivity}
       />
-      <main className="main">
+      <main className={"main" + (focusCamId ? " main--focus" : "")}>
         {/* Wrap the preset grid so FocusOverlay can absolute-position over
           * just that area — the bottom feed row (PTZ pads + dock) stays put
           * and usable while focus mode is active. PresetGrid stays mounted

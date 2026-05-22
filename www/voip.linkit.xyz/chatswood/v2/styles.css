@@ -670,6 +670,19 @@ em { font-style: normal; }
 }
 .preset-area > .preset-grid { flex: 1; min-height: 0; }
 
+/* In focus mode, shrink ONLY the video preview in each feed card to 50%
+ * size (keeps 16:9, so height halves), centred in the card. Heads, PTZ
+ * pads, DataControls and the dock all stay full size and fully usable —
+ * the operator can still jog/zoom/focus while framing in the big view.
+ * Each card loses ~half its video height, which shortens the `auto`
+ * feed-row track and lets the `minmax(0,1fr)` focus area above grow into
+ * the reclaimed space. (Earlier this used `zoom: 0.5` on the whole row,
+ * which shrank the PTZ buttons too — not what we want.) */
+.main--focus .feed .feed-img {
+  width: 50%;
+  align-self: center;
+}
+
 .focus-overlay {
   position: absolute;
   inset: 0;
@@ -679,6 +692,9 @@ em { font-style: normal; }
   overflow: hidden;
   border: 1px solid var(--live);
   box-shadow: 0 0 0 1px var(--live), 0 0 28px rgba(34,197,94,0.22);
+  /* Establish a size query container so the framing overlay can size itself
+     to the letterboxed 16:9 video box via cqw/cqh units (see .focus-cross). */
+  container-type: size;
 }
 .focus-video {
   width: 100%; height: 100%;
@@ -691,8 +707,19 @@ em { font-style: normal; }
 .focus-overlay video::-internal-media-controls-overflow-button,
 .focus-overlay video::-webkit-media-controls-overlay-enclosure { display: none !important; }
 
-/* Framing aids — purely visual, no pointer interaction. */
-.focus-cross { position: absolute; inset: 0; pointer-events: none; }
+/* Framing aids — purely visual, no pointer interaction.
+   The video uses object-fit: contain, so it letterboxes inside the overlay
+   when the container isn't exactly 16:9. Match this overlay to that rendered
+   video box (centred, 16:9, scaled to fit) instead of the full container so
+   the rule-of-thirds lines and reticle line up with the actual image. */
+.focus-cross {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width:  min(100cqw, 100cqh * 16 / 9);
+  height: min(100cqh, 100cqw * 9 / 16);
+  pointer-events: none;
+}
 .focus-rt {
   position: absolute;
   background: rgba(255, 255, 255, 0.18);
