@@ -1,1 +1,1 @@
-&"C:\Program Files\Beyond Compare 5\BCompare.exe" "$PSScriptRoot" "profile:root@srv-aus02-zt.linkit.xyz?/var/www/voip.linkit.xyz"
+&"C:\Program Files\Beyond Compare 5\BCompare.exe" "$PSScriptRoot" "profile:root@srv-syd05-zt.chatswoodchurch.org?/var/www/chatswood"
