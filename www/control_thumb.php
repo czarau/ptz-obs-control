@@ -10,6 +10,33 @@
   // CMP is on the same 192.168.0.0/24 subnet as the cameras and is proxied by
   // the nginx 8810 server block.
   $cmp_url = 'http://192.168.0.139:8810';
+  $tracker_url = 'http://127.0.0.1:8095';
+
+  function PresenterTrackerRequest($path, $timeout = 2)
+  {
+    global $tracker_url;
+    $ch = curl_init($tracker_url . $path);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+    $body = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    return [$body, $code, $err];
+  }
+
+  function PausePresenterTracker($cam, $seconds = 3.0)
+  {
+    if ((int)$cam !== 1) return null;
+    $seconds = max(0.0, (float)$seconds);
+    return PresenterTrackerRequest('/pause?' . http_build_query(['seconds' => $seconds]), 1);
+  }
+
+  function IsTrackerSource()
+  {
+    return isset($_GET['source']) && $_GET['source'] === 'tracker';
+  }
 
   function GetCameraIP($cam)
   {
@@ -148,6 +175,9 @@
       // PHP already URL-decoded these — preserve them by re-encoding.
       $qs[] = (is_numeric($k) ? (string)$k : rawurlencode($k))
         . ($v === '' ? '' : '=' . rawurlencode((string)$v));
+    }
+    if (!IsTrackerSource() && preg_match('/^ptzcmd&(left|right|up|down|leftup|rightup|leftdown|rightdown|zoomin|zoomout|focusin|focusout|poscall|home)\b/i', $q)) {
+      PausePresenterTracker($cam, 3.0);
     }
     $full = GetCameraURL($cam) . '/cgi-bin/ptzctrl.cgi?' . $q
           . (count($qs) ? '&' . implode('&', $qs) : '');
@@ -305,6 +335,28 @@
     $jpg = file_get_contents("thumbs/{$id}.jpg");
     echo $jpg;
   }
+  elseif ($_GET['cmd'] == 'tracker')
+  {
+    // Presenter tracker sidecar on localhost:8095. This is the new coarse
+    // PTZ reframing method; the legacy CMP face path below remains intact
+    // as cmd=face for rollback / comparison.
+    $cam = isset($_GET['camera']) && is_numeric($_GET['camera']) ? (int)$_GET['camera'] : 1;
+    if ($cam !== 1) { http_response_code(400); header('Content-Type: application/json'); echo json_encode(['error' => 'tracker only supports camera 1']); die; }
+    $action = $_GET['action'] ?? 'status';
+    if ($action === 'start') {
+      [$body, $code, $err] = PresenterTrackerRequest('/start?' . http_build_query(['camera' => 1, 'dry_run' => '0']), 3);
+    } elseif ($action === 'stop') {
+      [$body, $code, $err] = PresenterTrackerRequest('/stop', 3);
+    } elseif ($action === 'pause') {
+      $seconds = isset($_GET['seconds']) && is_numeric($_GET['seconds']) ? (float)$_GET['seconds'] : 3.0;
+      [$body, $code, $err] = PresenterTrackerRequest('/pause?' . http_build_query(['seconds' => $seconds]), 3);
+    } else {
+      [$body, $code, $err] = PresenterTrackerRequest('/status', 3);
+    }
+    header('Content-Type: application/json');
+    if ($code >= 200 && $code < 300 && $body !== false && $body !== null && $body !== '') echo $body;
+    else { http_response_code(502); echo json_encode(['error' => 'tracker unavailable', 'http_code' => $code, 'curl_error' => $err]); }
+  }
   elseif ($_GET['cmd'] == 'face')
   {
     // netstat -ano
@@ -351,11 +403,14 @@
     $visca = GetCameraVISCA($cam);
     if (!$visca) die;
 
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
     header('Content-Type: application/json');
-    echo json_encode(visca_run($visca, function (Visca $v) use ($val, $visca) {
+    $out = visca_run($visca, function (Visca $v) use ($val, $visca) {
       $r = $v->recallPreset((int)$val);
       return ['camera' => $visca[0], 'response' => visca_jsonable($r)] + $v->getAllPositions();
-    }));
+    });
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
+    echo json_encode($out);
   }
   elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
   {
@@ -405,8 +460,9 @@
       }
     }
 
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
     header('Content-Type: application/json');
-    echo json_encode(visca_run($visca, function (Visca $v) use ($axes, $visca) {
+    $out = visca_run($visca, function (Visca $v) use ($axes, $visca) {
       $steps           = [];
       $response        = null;
       $focusPriorMode  = null;
@@ -449,7 +505,9 @@
       if ($steps)                    $out['steps']             = $steps;
       if ($focusPriorMode !== null)  $out['focus_prior_mode']  = $focusPriorMode;
       return $out;
-    }));
+    });
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
+    echo json_encode($out);
   }
   elseif ($_GET['cmd'] == 'preset_speed')
   {

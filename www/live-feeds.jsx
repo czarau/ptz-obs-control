@@ -562,20 +562,41 @@ function PTZPad({ camera, ptzSpeed = 6 }) {
   );
 }
 
-// Face-tracking toggle. Calls the CMP (PTZOptics Camera Management Platform)
-// running on srv-syd05:8810 via the existing control_thumb.php?cmd=face
-// wrapper. Local state — the CMP doesn't expose a status endpoint, so toggles
-// are optimistic and persist only until the page reloads. Sits compact under
-// the joystick ring so it reads as "part of the PTZ".
+// Face-tracking toggle. The legacy CMP path remains available as
+// control_thumb.php?cmd=face, but this button is currently wired to the local
+// presenter-tracker sidecar. That sidecar uses the conservative high-zoom
+// coarse-reframe logic rather than continuous PTZOptics auto-tracking.
 function FollowFaceToggle({ camera }) {
   const [on, setOn] = useStateLF(false);
   const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || 'control_thumb.php';
 
+  useEffectLF(() => {
+    if (camera !== 1) return;
+    fetch(`${endpoint}?cmd=tracker&camera=${camera}&action=status&ts=${Date.now()}`)
+      .then(r => r.json())
+      .then(data => setOn(!!(data && data.running && !data.dry_run)))
+      .catch(() => {});
+  }, [camera]);
+
   const toggle = () => {
     const next = !on;
     setOn(next);
-    fetch(`${endpoint}?cmd=face&camera=${camera}&pos=${next ? 1 : 0}&ts=${Date.now()}`).catch(() => {});
-    window.Log?.add('camera', `Face tracking ${next ? 'ON' : 'OFF'} · Cam ${camera}`);
+    const action = next ? 'start' : 'stop';
+    fetch(`${endpoint}?cmd=tracker&camera=${camera}&action=${action}&ts=${Date.now()}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.error) {
+          setOn(on);
+          window.Log?.add('error', `Presenter tracking failed · Cam ${camera}`, data.error);
+        } else {
+          setOn(!!(data && data.running && !data.dry_run));
+        }
+      })
+      .catch(err => {
+        setOn(on);
+        window.Log?.add('error', `Presenter tracking fetch failed · Cam ${camera}`, String(err));
+      });
+    window.Log?.add('camera', `Presenter tracking ${next ? 'ON' : 'OFF'} · Cam ${camera}`, 'coarse PTZ reframing');
   };
 
   return (
@@ -583,7 +604,7 @@ function FollowFaceToggle({ camera }) {
       className={"ctrl-track" + (on ? " on" : "")}
       aria-pressed={on}
       onClick={toggle}
-      title={on ? 'Stop face tracking' : 'Start face tracking'}
+      title={on ? 'Stop presenter tracking' : 'Start presenter tracking'}
     >
       <span className="ctrl-track-dot" />
       <em>{on ? 'TRACKING' : 'FOLLOW FACE'}</em>

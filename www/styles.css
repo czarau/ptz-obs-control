@@ -687,6 +687,17 @@ em { font-style: normal; }
   align-self: center;
 }
 
+/* The feed-row is an `auto` grid track sized by its TALLEST column. Shrinking
+ * the feed videos (above) only reclaims space if the dock (5th column) is
+ * shorter than the shrunken cards — otherwise the dock pins the row tall and
+ * the focus view can't grow. The dock-take section (Dissolve slider + TAKE
+ * button) is ~133px and was tipping the dock past the shrunken cards, so the
+ * row stopped shrinking in focus mode. Neither control is relevant while the
+ * operator is framing/focusing one camera, so hide the section in focus mode:
+ * the dock drops to meters+health, the row collapses to the feed cards, and
+ * the focus overlay grows into the reclaimed height. */
+.main--focus .dock-take { display: none; }
+
 .focus-overlay {
   position: absolute;
   inset: 0;
