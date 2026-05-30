@@ -672,9 +672,7 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       // mistake it for an operator steal.
       queuePreRollIdRef.current = nextId;
       queuePreRollCamRef.current = nextCam;
-      const preRollPromise = moveCamera(nextPreset);
       setActiveByCam(m => ({ ...m, [nextCam]: nextId }));
-      setMotionByCam(m => ({ ...m, [nextCam]: nextId }));
       // Clear motion + refresh thumb as soon as the camera actually arrives.
       // Server-side goto_abs blocks until VISCA COMPLETE so the promise IS
       // the arrival signal — no polling race.
@@ -693,14 +691,43 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
             .catch(() => {});
         });
       };
-      preRollPromise.then(arrived => {
-        if (arrived && arrived.pan != null) onPreRollArrived();
-        else window.PTZState?.settle(nextPreset.camera).then(onPreRollArrived);
-      });
+      // Delay the physical PTZ pre-roll move by 3 s so the newly-live
+      // camera has time to settle before the off-air camera starts panning.
+      setTimeout(() => {
+        if (activeByCamRef.current[nextCam] !== nextId) return; // claim superseded
+        setMotionByCam(m => ({ ...m, [nextCam]: nextId }));
+        const preRollPromise = moveCamera(nextPreset);
+        preRollPromise.then(arrived => {
+          if (arrived && arrived.pan != null) onPreRollArrived();
+          else window.PTZState?.settle(nextPreset.camera).then(onPreRollArrived);
+        });
+      }, 3000);
     } else {
       // No pre-roll this tick (same camera). Clear any prior claim.
       queuePreRollIdRef.current = null;
       queuePreRollCamRef.current = null;
+    }
+
+    // Clear stale queue-* tags from any camera that is no longer the
+    // live cam nor the armed pre-roll cam. Without this sweep, a camera
+    // that was the pre-roll target one or more iterations ago keeps its
+    // "armed" border even after the queue has moved past it (e.g. cam 3
+    // stays tagged when cam 2 is now NEXT).
+    {
+      const keepCams = new Set([cam]);
+      if (nextCam && nextCam !== cam) keepCams.add(nextCam);
+      setActiveByCam(m => {
+        let changed = false;
+        const out = { ...m };
+        for (const k of Object.keys(out)) {
+          const v = out[k];
+          if (!keepCams.has(k) && typeof v === "string" && v.startsWith("queue-")) {
+            out[k] = null;
+            changed = true;
+          }
+        }
+        return changed ? out : m;
+      });
     }
 
     // Override the ping-pong cue (set by onTakeSceneLive → outgoing cam)
