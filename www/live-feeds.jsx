@@ -360,8 +360,9 @@ function makePulser(stopCmd, sendStart, fastSpeed, slowSpeed) {
 }
 
 function PTZPad({ camera, ptzSpeed = 6 }) {
-  // Scale 1-10 UI speed → 1-24 camera range (pan/tilt) and 1-7 (zoom/focus)
-  const panSpeed  = Math.max(1, Math.min(24, Math.round(ptzSpeed * 2.4)));
+  // Scale 1-10 UI speed → 1-72 camera range for pan/tilt (x3 of the old
+  // 24-step ceiling) and 1-7 (zoom/focus).
+  const panSpeed  = Math.max(1, Math.min(72, Math.round(ptzSpeed * 7.2)));
   const zoomSpeed = Math.max(1, Math.min(7, Math.round(ptzSpeed * 0.7)));
 
   // Right-click on the HOME button captures the camera's current pan/tilt/

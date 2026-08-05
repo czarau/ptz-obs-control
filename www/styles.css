@@ -207,6 +207,10 @@ em { font-style: normal; }
 .bigbtn-active-live { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.35); }
 .bigbtn-active-live .bigbtn-icon { background: var(--live); color: #04130a; }
 .bigbtn-active-live .bigbtn-sub { color: var(--live); }
+.bigbtn-starting { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.45); }
+.bigbtn-starting .bigbtn-icon { background: var(--warn); color: #241500; }
+.bigbtn-starting .bigbtn-label,
+.bigbtn-starting .bigbtn-sub { color: var(--warn); }
 
 .ptz-row { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; justify-content: space-between; }
 .ptz-ticks { display: flex; gap: 2px; }

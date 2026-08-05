@@ -12,7 +12,9 @@ function smartDevice(device, state) {
 const DEVICE_LABEL = { SPOTS: 'Spots', STAGE: 'Stage', FRONT: 'Front', LG_LEFT: 'TV Left', LG_RIGHT: 'TV Right' };
 const AUDIO_LABEL  = { church: 'Church Mix', video: 'Video Mix', backup: 'Video Mix (Backup)' };
 
-function LeftRail({ state, setState, onEmergency, admin, setAdmin, emergencyLive, recordSub, streamSub }) {
+function LeftRail({ state, setState, onEmergency, admin, setAdmin, emergencyLive, recordSub, streamSub, streamTitle }) {
+  const [streamPending, setStreamPending] = React.useState(null);
+
   const toggleDevice = (key, device) => {
     const next = !state[key];
     setState(s => ({ ...s, [key]: next }));
@@ -23,7 +25,10 @@ function LeftRail({ state, setState, onEmergency, admin, setAdmin, emergencyLive
   const selectAudio = (kind) => {
     if (state.audio === kind) return;
     setState(s => ({ ...s, audio: kind }));
-    if (window.OBS) window.OBS.setAudioSource(kind).catch(() => {});
+    if (window.OBS) {
+      window.OBS.repairAudioDevices?.().catch(() => {});
+      window.OBS.setAudioSource(kind).catch(() => {});
+    }
     window.Log?.add('audio', `Audio source → ${AUDIO_LABEL[kind] || kind}`);
   };
 
@@ -35,10 +40,18 @@ function LeftRail({ state, setState, onEmergency, admin, setAdmin, emergencyLive
   };
 
   const toggleStream = () => {
+    if (streamPending || !window.OBS) return;
     const next = !state.streaming;
-    setState(s => ({ ...s, streaming: next }));
-    if (window.OBS) window.OBS.toggleStream().catch(() => {});
-    window.Log?.add('broadcast', `Streaming ${next ? 'started' : 'stopped'}`);
+    setStreamPending(next ? 'starting' : 'stopping');
+    window.OBS.toggleStream()
+      .then(() => {
+        setState(s => ({ ...s, streaming: next }));
+        window.Log?.add('broadcast', `Streaming ${next ? 'started' : 'stopped'}`);
+      })
+      .catch(err => {
+        window.Log?.add('broadcast', `Streaming ${next ? 'start' : 'stop'} failed: ${err.message || err}`);
+      })
+      .finally(() => setStreamPending(null));
   };
 
   return (
@@ -71,7 +84,14 @@ function LeftRail({ state, setState, onEmergency, admin, setAdmin, emergencyLive
       <Section title="Broadcast">
         <BigButton label="Emergency" tone={emergencyLive ? "active-emergency" : "danger"} icon="alert" sub={emergencyLive ? "ON AIR" : undefined} onClick={onEmergency}/>
         <BigButton label="Record" tone={state.recording ? "active-record" : "default"} icon="rec" sub={state.recording ? (recordSub || "recording") : "stopped"} onClick={toggleRecord}/>
-        <BigButton label="Stream" tone={state.streaming ? "active-live" : "default"}   icon="stream" sub={state.streaming ? (streamSub ? `LIVE · ${streamSub}` : "LIVE") : "offline"} onClick={toggleStream}/>
+        <BigButton
+          label="Stream"
+          tone={streamPending === 'starting' ? "starting" : (state.streaming ? "active-live" : "default")}
+          icon="stream"
+          sub={streamPending ? `${streamPending}…` : (state.streaming ? (streamSub ? `LIVE · ${streamSub}` : "LIVE") : (streamTitle ? `Ready · ${streamTitle}` : "offline"))}
+          onClick={toggleStream}
+          disabled={Boolean(streamPending)}
+        />
       </Section>
 
       <div className="rail-spacer" />
@@ -174,9 +194,9 @@ function Radio({ label, sub, checked, onClick }) {
   );
 }
 
-function BigButton({ label, tone = "default", icon, sub, onClick }) {
+function BigButton({ label, tone = "default", icon, sub, onClick, disabled = false }) {
   return (
-    <button className={"bigbtn bigbtn-" + tone} onClick={onClick}>
+    <button className={"bigbtn bigbtn-" + tone} onClick={onClick} disabled={disabled}>
       <span className="bigbtn-icon"><Icon name={icon} size={15}/></span>
       <span className="bigbtn-text">
         <span className="bigbtn-label">{label}</span>

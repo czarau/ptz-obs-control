@@ -10,6 +10,16 @@ function App() {
     ptzSpeed: 6,
   });
 
+  useEffect(() => {
+    if (!window.OBS) return;
+    const syncAudioDevices = () => {
+      window.OBS.repairAudioDevices?.().catch(() => {});
+    };
+    syncAudioDevices();
+    const id = setInterval(syncAudioDevices, 60000);
+    return () => clearInterval(id);
+  }, []);
+
   // Dissolve (scene-transition) duration in ms, driven by a slider above the
   // TAKE button. Applied to OBS on every take via switchScene(); initialised
   // from OBS's current transition below so the slider reflects reality.
@@ -164,12 +174,26 @@ function App() {
     takeCuedScene();
   };
 
+  useEffect(() => {
+    let alive = true;
+    const syncTitle = () => {
+      fetch('roster-current.php', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (alive && data && data.stream_title) setStreamTitle(data.stream_title); })
+        .catch(() => {});
+    };
+    syncTitle();
+    const id = setInterval(syncTitle, 3600000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
   // Poll OBS record/stream status + stats. We derive start-at-timestamps
   // (now - outputDuration) so any locally-computed "HH:MM:SS" timer can
   // just read Date.now() on every tick — drift-free between polls.
   const [recordStartedAt, setRecordStartedAt] = useState(null);
   const [streamStartedAt, setStreamStartedAt] = useState(null);
   const [streamHealth, setStreamHealth] = useState(null);
+  const [streamTitle, setStreamTitle] = useState('');
   const streamBytesRef = React.useRef({ bytes: 0, ts: 0, kbps: 0 });
 
   useEffect(() => {
@@ -337,7 +361,7 @@ function App() {
 
   return (
     <div className="app">
-      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} emergencyLive={liveCamId === 'emergency'} recordSub={recordSub} streamSub={streamSub} />
+      <LeftRail state={rail} setState={setRail} onEmergency={onEmergency} admin={admin} setAdmin={setAdmin} emergencyLive={liveCamId === 'emergency'} recordSub={recordSub} streamSub={streamSub} streamTitle={streamTitle} />
       <TopBar
         cueIdx={cueIdx}
         setCueIdx={setCueIdx}

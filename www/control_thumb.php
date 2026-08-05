@@ -177,7 +177,7 @@
         . ($v === '' ? '' : '=' . rawurlencode((string)$v));
     }
     if (!IsTrackerSource() && preg_match('/^ptzcmd&(left|right|up|down|leftup|rightup|leftdown|rightdown|zoomin|zoomout|focusin|focusout|poscall|home)\b/i', $q)) {
-      PausePresenterTracker($cam, 3.0);
+      PausePresenterTracker($cam, 1.0);
     }
     $full = GetCameraURL($cam) . '/cgi-bin/ptzctrl.cgi?' . $q
           . (count($qs) ? '&' . implode('&', $qs) : '');
@@ -403,13 +403,13 @@
     $visca = GetCameraVISCA($cam);
     if (!$visca) die;
 
-    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 1.0);
     header('Content-Type: application/json');
     $out = visca_run($visca, function (Visca $v) use ($val, $visca) {
       $r = $v->recallPreset((int)$val);
       return ['camera' => $visca[0], 'response' => visca_jsonable($r)] + $v->getAllPositions();
     });
-    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 1.0);
     echo json_encode($out);
   }
   elseif ($_GET['cmd'] == 'focus_auto' || $_GET['cmd'] == 'focus_manual' || $_GET['cmd'] == 'focus_onepush')
@@ -460,7 +460,7 @@
       }
     }
 
-    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 1.0);
     header('Content-Type: application/json');
     $out = visca_run($visca, function (Visca $v) use ($axes, $visca) {
       $steps           = [];
@@ -506,7 +506,7 @@
       if ($focusPriorMode !== null)  $out['focus_prior_mode']  = $focusPriorMode;
       return $out;
     });
-    if (!IsTrackerSource()) PausePresenterTracker($cam, 3.0);
+    if (!IsTrackerSource()) PausePresenterTracker($cam, 1.0);
     echo json_encode($out);
   }
   elseif ($_GET['cmd'] == 'preset_speed')
