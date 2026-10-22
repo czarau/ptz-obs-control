@@ -33,6 +33,7 @@ window.capturePresetThumb = function (camera, slot) {
     canvas.width = w; canvas.height = h;
     canvas.getContext('2d').drawImage(video, 0, 0, w, h);
     return new Promise(resolve => {
+      try {
       canvas.toBlob(blob => {
         if (!blob) { resolve(false); return; }
         const endpoint = (window.LS_CONFIG || {}).thumbEndpoint || 'control_thumb.php';
@@ -40,6 +41,13 @@ window.capturePresetThumb = function (camera, slot) {
           .then(r => resolve(r.ok))
           .catch(() => resolve(false));
       }, 'image/jpeg', 0.85);
+      } catch (_) {
+        // Tainted canvas (cross-origin <video>) throws SecurityError here.
+        // A throw inside the executor rejects this promise, which would
+        // propagate into the awaiting click handler and kill every later
+        // click. Thumbnails are cosmetic — report failure, never reject.
+        resolve(false);
+      }
     });
   } catch (_) { return Promise.resolve(false); }
 };

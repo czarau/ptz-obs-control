@@ -883,7 +883,7 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
       return fetch(`${endpoint}?cmd=thumb&camera=${cam}&id=${presetId}&ts=${Date.now()}`)
         .then(() => bump())
         .catch(() => {});
-    });
+    }).catch(() => {});
   };
 
   // Clear the "at-position" marker for a camera whenever it's manually jogged
@@ -1162,7 +1162,21 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     ).catch(() => {});
 
     Promise.all([save, copyThumb])
-      .then(() => setRefreshMap(m => ({ ...m, [destId]: Date.now() + 1 })))
+      .then(() => {
+        setRefreshMap(m => ({ ...m, [destId]: Date.now() + 1 }));
+        // The copy may have moved this tile into a different camera's bucket.
+        // Any arming still pointing at it belongs to the OLD camera, so clear
+        // it rather than leave activeByCam pointing across buckets.
+        setActiveByCam(m => {
+          let changed = false;
+          const next = {};
+          for (const c of Object.keys(m)) {
+            if (m[c] === destId) { changed = true; continue; }
+            next[c] = m[c];
+          }
+          return changed ? next : m;
+        });
+      })
       .catch(err => window.Log?.add('error', `Copy failed · ${destLabel}`, String(err)));
   };
 
@@ -1182,7 +1196,7 @@ function PresetGrid({ liveId, setLive, liveCamera, onTakeSceneLiveFromNumber, se
     // it's currently showing and cache it against the outgoing preset.
     // Awaited so the server gets the snapshot from the camera BEFORE the
     // move command races through. Safe no-op if nothing was armed.
-    await snapshotActiveOnCam(cam);
+    await snapshotActiveOnCam(cam).catch(() => {});
 
     // First click → send the camera to this preset. moveCamera now returns
     // the goto_abs response promise, which resolves AFTER server-side
